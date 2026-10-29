@@ -136,6 +136,16 @@
       <tr><td>Fast red blinking</td><td>USB chip fault (write the firmware again)</td></tr>
       <tr><td>One red blink every 5 s</td><td>Supply voltage low (below 4.5 V)</td></tr>
     </table>
+    <h3>Current draw (for reference)</h3>
+    <p>KB Bridge also powers the keyboard, so battery life depends mostly on the keyboard. Ordinary wired keyboards are not designed for low power the way wireless keyboards are, so the battery runs down faster than with a typical wireless keyboard. Examples measured with a USB current meter at 5 V:</p>
+    <table>
+      <tr><th>State</th><th>Current</th></tr>
+      <tr><td>KB Bridge alone (no keyboard, keep-alive off)</td><td>The meter shows 0.00 A (below 1 mA)</td></tr>
+      <tr><td>Typing on an attached keyboard</td><td>About 11 mA (with the keyboard we measured)</td></tr>
+      <tr><td>Keep-alive "weak"</td><td>Adds about 0.75 mA on average</td></tr>
+      <tr><td>Keep-alive "strong"</td><td>Adds about 6 mA on average</td></tr>
+    </table>
+    <p class="muted">Keyboards with RGB lighting draw much more. Without input the keyboard is put into USB suspend after 2 minutes; a keyboard that saves power in suspend (QMK's <code>rgb_matrix.sleep</code> and the like) then draws much less.</p>
     <h3>Automatic power-off</h3>
     <p>After 10 minutes without a connection to any device, KB Bridge powers off (the LED goes dark) and so does the attached keyboard. <strong>Press LOW-I</strong> or <strong>unplug and replug the keyboard</strong> to start it again; it goes back to waiting for a connection (the LOW-I press that wakes it does not change the keep-alive setting). PAIR does not wake it.</p>
     <p class="muted">On a power bank, the keep-alive stops while KB Bridge is off, so the power bank may switch off too. Switch the power bank back on in that case.</p>
