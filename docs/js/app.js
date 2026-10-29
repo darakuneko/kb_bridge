@@ -81,7 +81,7 @@ function applyText() {
   document.documentElement.lang = lang;
   for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
   $('lang').textContent = lang === 'ja' ? 'English' : '日本語';
-  $('guide').href = lang === 'ja' ? 'guide.html' : 'guide_en.html';
+  $('guide').href = lang === 'ja' ? 'guide_ja.html' : 'guide_en.html';
   fillBoards();
 }
 

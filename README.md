@@ -4,12 +4,13 @@ Firmware, browser-based flashing pages and the build guide for KB Bridge, an ada
 
 - Firmware updater: https://darakuneko.github.io/kb_bridge/
 - CH559 first flash: https://darakuneko.github.io/kb_bridge/ch559.html
-- Build guide: https://darakuneko.github.io/kb_bridge/guide_en.html (Japanese: https://darakuneko.github.io/kb_bridge/guide.html)
+- Build Guide(EN): https://darakuneko.github.io/kb_bridge/guide_en.html
+- Build Guide(JA): https://darakuneko.github.io/kb_bridge/guide_ja.html
 
 | Path | Contents |
 |---|---|
 | `fw/` | Firmware (CH559L USB host + nRF52832 BLE). Details in [fw/README.md](fw/README.md) |
-| `docs/` | GitHub Pages site: updater (`index.html`), build guide (`guide_en.html`, Japanese `guide.html`), CH559 first flash (`ch559.html`), published firmware (`firmware/`) |
+| `docs/` | GitHub Pages site: updater (`index.html`), build guide (`guide_en.html`, `guide_ja.html`), CH559 first flash (`ch559.html`), published firmware (`firmware/`) |
 | `docs/hardware/` | For people who design their own case: PCBA STL (HY0020 fitted, mm) and a dimension drawing (PDF) |
 | `tools/gen_dimensions.py` | Generates the dimension PDF and the button map (`docs/img/buttons.svg`); needs matplotlib. The STL comes from the KiCad board: `kicad-cli pcb export step --no-dnp --subst-models --user-origin 128x113mm` (J4 set to DNP), converted to STL with CadQuery (`tolerance=0.05`). The STEP is not published |
 | `tools/add_firmware.py` | Adds a build to `docs/firmware/` and updates the list |
