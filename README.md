@@ -18,16 +18,6 @@ Firmware, browser-based flashing pages and the build guide for KB Bridge, an ada
 - Both run in Chrome / Edge on a computer (Windows, macOS, Linux). Not in Safari, Firefox or on phones.
 - Static pages, no build step and no external libraries.
 
-## Publishing firmware
-
-```sh
-# 1. Build (BOARD_REV must match the board; v0.6 and v0.7 firmware differ)
-BOARD_REV=7 fw/build.sh
-# 2. Add it (version = FW_VERSION_STR in fw/nrf/kb_bridge/config.h; the CH559 bin is added too)
-tools/add_firmware.py fw/build/kb_bridge_dfu.zip --board v0.7 --notes "変更点" --notes-en "What changed"
-# 3. Commit and push: GitHub Pages serves it
-```
-
 ## Local testing
 
 Web Serial / WebUSB only work over https or on localhost.
