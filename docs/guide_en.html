@@ -12,7 +12,7 @@
     <h1>KB Bridge Build Guide</h1>
     <a href="guide_ja.html" lang="ja">日本語</a>
   </header>
-  <p class="lead">KB Bridge is an adapter that turns a wired USB-C keyboard into a Bluetooth LE keyboard. This guide covers soldering the HY0020 (an nRF52832 BLE module), writing the firmware and assembling the case.</p>
+  <p class="lead">KB Bridge is an adapter that turns a wired USB-C keyboard into a BLE (wireless) keyboard. This guide covers soldering the HY0020 (an nRF52832 BLE module), writing the firmware and assembling the case.</p>
   <nav class="toc">
     <a href="#parts">1. What you need</a>
     <a href="#ch559">2. Write the CH559</a>
@@ -90,7 +90,7 @@
     <h2>5. Check it works</h2>
     <ol class="steps">
       <li>Plug J1 into a USB power source (a computer or a power bank) without pressing PAIR. A short green blink every second means it is waiting for a connection.</li>
-      <li>Pair with "KB Bridge" in the Bluetooth settings of your computer or phone. Once connected, the LED stays green for 2 seconds.</li>
+      <li>Pair with "KB Bridge" in the wireless (pairing) settings of your computer or phone. Once connected, the LED stays green for 2 seconds.</li>
       <li>Plug the keyboard into J2 (the USB-C plug). The keyboard works after about 2 seconds.</li>
     </ol>
   </section>
@@ -151,15 +151,15 @@
     <p class="muted">On a power bank, the keep-alive stops while KB Bridge is off, so the power bank may switch off too. Switch the power bank back on in that case.</p>
     <h3>Limitations</h3>
     <ul>
-      <li>It connects to one device at a time. There is no button to switch between devices: to use it with another one, turn off Bluetooth on the device it is connected to.</li>
+      <li>It connects to one device at a time. There is no button to switch between devices: to use it with another one, disconnect it from the device it is connected to.</li>
       <li>One keyboard plugs directly into J2. USB hubs are not supported; keyboards with a built-in USB hub are untested and will most likely not work.</li>
-      <li>Up to 6 keys at once (an NKRO keyboard is sent as 6KRO over Bluetooth).</li>
+      <li>Up to 6 keys at once (an NKRO keyboard is sent as 6KRO over BLE).</li>
       <li>Tested with iPhone, macOS and Ubuntu. Windows and Android have not been tested.</li>
       <li>There is no key remapping in KB Bridge. Change the keymap on the keyboard (Vial etc.).</li>
     </ul>
     <h3>Vial</h3>
-    <p>With a Vial-enabled keyboard you can change the keymap in Vial while connected over Bluetooth. Key remapping is done on the keyboard (in Vial), not in KB Bridge.</p>
-    <p>Vial responds slowly over Bluetooth, though, so for configuring it is better to connect the keyboard to the computer directly with a USB cable.</p>
+    <p>With a Vial-enabled keyboard you can change the keymap in Vial while connected over BLE. Key remapping is done on the keyboard (in Vial), not in KB Bridge.</p>
+    <p>Vial responds slowly over BLE, though, so for configuring it is better to connect the keyboard to the computer directly with a USB cable.</p>
   </section>
 
   <section id="trouble">
@@ -167,10 +167,10 @@
     <table>
       <tr><th>Problem</th><th>What to do</th></tr>
       <tr><td>The LED never lights</td><td>Check the HY0020 soldering, then write the firmware again with the <a href="./?lang=en">updater</a></td></tr>
-      <tr><td>"KB Bridge" does not show up in the Bluetooth list</td><td>Short-press PAIR to start waiting for a connection. If a device you paired before still has KB Bridge registered, remove it in that device's Bluetooth settings</td></tr>
+      <tr><td>"KB Bridge" does not show up in the list of devices to connect</td><td>Short-press PAIR to start waiting for a connection. If a device you paired before still has KB Bridge registered, remove it in that device's wireless settings</td></tr>
       <tr><td>It will not connect, or keeps disconnecting</td><td>Hold PAIR for 3 s to forget the pairings, remove KB Bridge on the other device as well, and pair again</td></tr>
       <tr><td>The power bank switches off</td><td>Press LOW-I to choose "strong" (green ×3)</td></tr>
-      <tr><td>On Linux (Ubuntu etc.) typing stops working after a while; reconnecting Bluetooth fixes it</td><td>The computer's Bluetooth adapter power saving (USB autosuspend) causes this. If <code>cat /sys/module/btusb/parameters/enable_autosuspend</code> prints <code>Y</code>, run <code>echo 'options btusb enable_autosuspend=0' | sudo tee /etc/modprobe.d/btusb.conf</code> and restart the computer (it should then print <code>N</code>)</td></tr>
+      <tr><td>On Linux (Ubuntu etc.) typing stops working after a while; reconnecting fixes it</td><td>The computer's wireless adapter power saving (USB autosuspend) causes this. If <code>cat /sys/module/btusb/parameters/enable_autosuspend</code> prints <code>Y</code>, run <code>echo 'options btusb enable_autosuspend=0' | sudo tee /etc/modprobe.d/btusb.conf</code> and restart the computer (it should then print <code>N</code>)</td></tr>
       <tr><td>Writing stops part way or fails</td><td>Unplug, plug in again while holding PAIR and write again. An interrupted write is fixed by writing again. If it keeps failing, clone the <a href="https://github.com/darakuneko/kb_bridge">GitHub repository</a> and write from your own computer (see "Local testing" in the README)</td></tr>
       <tr><td>"KB Bridge Update" does not appear on the updater</td><td>The CH559 may not have been written. Redo <a href="#ch559">2. Write the CH559</a> (this also works with the HY0020 fitted). If it still does not appear, check that you hold PAIR while plugging in and that the cable carries data</td></tr>
     </table>
@@ -203,7 +203,7 @@
     <h3>Notes for your case</h3>
     <ul>
       <li>Leave a hole where the LED (component side, (−14.0, 8.0) from the centre) can be seen.</li>
-      <li>Keep metal away from the HY0020 module (bottom side, J1 end); it weakens the Bluetooth signal.</li>
+      <li>Keep metal away from the HY0020 module (bottom side, J1 end); it weakens the wireless signal.</li>
       <li>Make sure PAIR and LOW-I can be pressed.</li>
     </ul>
   </section>

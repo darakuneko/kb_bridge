@@ -1,6 +1,6 @@
 # KB Bridge
 
-Firmware, browser-based flashing pages and the build guide for KB Bridge, an adapter that turns a wired USB-C keyboard into a Bluetooth LE keyboard (Vial works over Bluetooth too).
+Firmware, browser-based flashing pages and the build guide for KB Bridge, an adapter that turns a wired USB-C keyboard into a BLE keyboard (Vial works over BLE too).
 
 - Firmware updater: https://darakuneko.github.io/kb_bridge/
 - CH559 first flash: https://darakuneko.github.io/kb_bridge/ch559.html
