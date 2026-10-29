@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KB Bridge Build Guide</title>
+<link rel="stylesheet" href="style.css?v=2">
+</head>
+<body>
+<main class="doc">
+  <header>
+    <h1>KB Bridge ビルドガイド</h1>
+  </header>
+  <p class="lead">有線の QMK / Vial キーボードを Bluetooth（BLE）キーボードにするアダプターです。HY0020（nRF52832 の BLE モジュール）のはんだ付け、ファームウェアの書き込み、ケースの組み立てまでの手順です。</p>
+  <nav class="toc">
+    <a href="#parts">1. 用意するもの</a>
+    <a href="#ch559">2. CH559 の書き込み</a>
+    <a href="#solder">3. HY0020 のはんだ付け</a>
+    <a href="#firmware">4. ファームウェアの書き込み</a>
+    <a href="#check">5. 動作確認</a>
+    <a href="#case">6. ケースの組み立て</a>
+    <a href="#use">7. 使い方</a>
+    <a href="#trouble">8. 困ったとき</a>
+    <a href="#custom">9. ケースを自作する</a>
+    <a href="#source">10. ソースコード</a>
+  </nav>
+
+  <section id="parts">
+    <h2>1. 用意するもの</h2>
+    <table>
+      <tr><th>部品</th><th>数</th><th>メモ</th></tr>
+      <tr><td>KB Bridge 基板</td><td>1</td><td>HY0020 以外の部品は実装済み。USB チップ（CH559）のファームは手順 2 で書き込む</td></tr>
+      <tr><td>AE-HY0020-DIP（秋月電子）</td><td>1</td><td>BLE モジュールの DIP 化キット</td></tr>
+      <tr><td>細ピンヘッダー（1 列 × 10 ピン以上）</td><td>1</td><td>AE-HY0020-DIP の穴に通る細いもの。長ければニッパーで切って使う</td></tr>
+      <tr><td>ケース（上・下）</td><td>1 組</td><td>3D プリント</td></tr>
+      <tr><td>M2 ヒートセットインサート</td><td>4</td><td>M2 × 長さ 3 × 外径 3 mm</td></tr>
+      <tr><td>M2 × 8 mm ネジ</td><td>4</td><td>付属。上から締める</td></tr>
+    </table>
+    <p>道具: はんだごて、はんだ、ニッパー、ジャンパー線（JP1 のショート用。ピンセットなどでも可）、マスキングテープ、USB-C ケーブル、パソコン（Chrome か Edge が動くもの）。</p>
+  </section>
+
+  <section id="ch559">
+    <h2>2. CH559 の書き込み</h2>
+    <p><strong>HY0020 をはんだ付けする前に</strong>、USB チップ（CH559）にファームウェアを書き込みます。<a href="ch559.html">CH559 の書き込みページ</a>で、パソコンの Chrome か Edge を使ってください。</p>
+    <ol class="steps">
+      <li>JP1（シルク「BOOT」）の 2 つの穴を、ジャンパー線の端などでショートしたまま、J1（USB-C の差し込み口）をパソコンにつなぎます。
+        <figure class="diagram"><img src="img/buttons.svg" style="max-width:100%;height:auto" alt="部品面の図: JP1（BOOT）の位置"></figure></li>
+      <li>ページの「書き込む」を押し、一覧から WCH のデバイス（4348:55E0）を選んで「接続」します。</li>
+      <li>「完了」と出たら USB を抜き、JP1 のショートをやめます。</li>
+    </ol>
+    <p class="muted">Windows では、最初の 1 回だけ Zadig で WinUSB ドライバーを入れる必要があります（書き込みページに説明があります）。HY0020 がまだないので、書き込んでも LED は光りません。確かめるなら、PAIR を押しながらつないで、パソコンに「KB Bridge Update」（シリアルポート）が出れば OK です。</p>
+  </section>
+
+  <section id="solder">
+    <h2>3. HY0020 のはんだ付け</h2>
+    <p>向き: AE-HY0020-DIP は基板の<strong>裏面</strong>（部品の少ない面）に、すき間を空けずに直接重ねます。HY0020 のモジュール（金属のふたが付いた部分）を <strong>J1（USB-C の差し込み口、シルク「BATTERY / PC」）側</strong>に向け、裏面のシルクの枠に合わせてください。</p>
+    <ol class="steps">
+      <li>細ピンヘッダーを<strong>部品面</strong>から KB Bridge 基板と AE-HY0020-DIP の両方に通します。プラスチックの部分は部品面に残ります。
+        <figure><img src="img/solder_1.jpg" alt="裏面に AE-HY0020-DIP を重ね、細ピンヘッダーを通した状態" loading="lazy"></figure></li>
+      <li>はんだ付けする面の反対側を、マスキングテープで固定します。裏面は AE-HY0020-DIP を、部品面は細ピンヘッダーのプラスチックを押さえます。
+        <figure><img src="img/solder_2.jpg" alt="裏面: AE-HY0020-DIP をマスキングテープで固定" loading="lazy"><img src="img/solder_3.jpg" alt="部品面: 細ピンヘッダーをマスキングテープで固定" loading="lazy"></figure></li>
+      <li>裏面（AE-HY0020-DIP 側）をはんだ付けします。はみ出たピンはニッパーで切り、はんだを整えます。
+        <figure><img src="img/solder_4.jpg" alt="裏面をはんだ付けした状態" loading="lazy"><img src="img/solder_5.jpg" alt="裏面のピンを切って整えた状態" loading="lazy"></figure></li>
+      <li>部品面のピンを、プラスチックごとニッパーで切ります。ケースに当たらないよう、突き出しは <strong>2 mm 以下</strong>にします。
+        <figure><img src="img/solder_6.jpg" alt="部品面のピンをプラスチックごとニッパーで切る" loading="lazy"><img src="img/solder_7.jpg" alt="ピンを切っているところ" loading="lazy"></figure></li>
+      <li>部品面もはんだ付けします。<strong>両面とも</strong>はんだ付けが必要です。
+        <figure><img src="img/solder_8.jpg" alt="部品面をはんだ付けした状態" loading="lazy"></figure></li>
+    </ol>
+    <p class="muted">モジュールの上（裏面）は、ケースに入れると空の側を向きます。BLE の電波の通りを良くするための配置です。</p>
+  </section>
+
+  <section id="firmware">
+    <h2>4. ファームウェアの書き込み</h2>
+    <p><a href="./">ファームウェア書き込みページ</a>で書き込みます。パソコンの Chrome か Edge を使ってください。</p>
+    <ol class="steps">
+      <li><strong>PAIR ボタンを押したまま</strong>、J1（USB-C の差し込み口）をパソコンにつなぎます。つないだらボタンは離してかまいません。</li>
+      <li>ページの「書き込む」を押し、一覧から「KB Bridge Update」を選んで「接続」します。</li>
+      <li>「完了」と出たら USB を抜き、PAIR を押さずにつなぎ直します。</li>
+    </ol>
+    <p class="muted">最初の起動で数秒、LED が赤と緑の交互に点滅することがあります。USB チップ（CH559）のファームを合わせて書き換えている合図なので、そのまま待ってください。以後の更新も同じ手順です。</p>
+  </section>
+
+  <section id="check">
+    <h2>5. 動作確認</h2>
+    <ol class="steps">
+      <li>PAIR を押さずに J1 を USB 電源（パソコンかモバイルバッテリー）につなぎます。LED が 1 秒ごとに緑に短く光れば、接続待ちです。</li>
+      <li>パソコンやスマートフォンの Bluetooth 設定で「KB Bridge」を選んでペアリングします。つながると LED が 2 秒間緑に光ります。</li>
+      <li>キーボードを J2（USB-C のプラグ）に挿します。約 2 秒でキーボードが使えるようになります。</li>
+    </ol>
+  </section>
+
+  <section id="case">
+    <h2>6. ケースの組み立て</h2>
+    <ol class="steps">
+      <li>下ケースの 4 つの穴に、はんだごてでヒートセットインサートを押し込みます。まっすぐ、ケースの面と同じ高さまで入れます。冷めるまで触らないでください。</li>
+      <li>基板を下ケースに置きます。J1 と J2 の位置を開口に合わせます。</li>
+      <li>上ケースをかぶせ、付属の M2 × 8 mm のネジ 4 本で留めます。締めすぎないでください。
+        <figure><img src="img/case_1.jpg" alt="ネジ止めしたケース。ネジ 4 本と LED の穴がある面" loading="lazy"></figure></li>
+    </ol>
+    <p class="muted">使うときは、平らな面（下ケースの底）が上になります。PAIR と LOW-I は、ケースに入れたまま上から押せます。</p>
+    <figure><img src="img/case_2.jpg" alt="使うときの向き: 平らな面が上" loading="lazy"></figure>
+  </section>
+
+  <section id="use">
+    <h2>7. 使い方</h2>
+    <h3>ボタン</h3>
+    <p>PAIR と LOW-I は、ケースに入れたまま上から押せます。位置は下の図のとおりです。</p>
+    <figure class="diagram"><img src="img/buttons.svg" style="max-width:100%;height:auto" alt="部品面の図: PAIR と LOW-I のボタン、JP1（BOOT）の位置"></figure>
+    <table>
+      <tr><th>ボタン</th><th>操作</th><th>動作</th></tr>
+      <tr><td>PAIR</td><td>短く押す</td><td>接続待ちを始める（別の機器とつなぐとき）</td></tr>
+      <tr><td>PAIR</td><td>3 秒押す</td><td>ペアリング情報をすべて消す（LED 赤 3 回）</td></tr>
+      <tr><td>PAIR</td><td>押しながら USB をつなぐ</td><td>ファームウェアの書き込みモード</td></tr>
+      <tr><td>LOW-I</td><td>押す</td><td>自動オフ対策を 弱 → 強 → なし の順に切り替え（設定は保存される。初期値は弱）</td></tr>
+    </table>
+    <h3>モバイルバッテリーの自動オフ対策（LOW-I）</h3>
+    <p>KB Bridge は待機中の電流がとても小さいので、モバイルバッテリーが「使われていない」と判断して電源を切ることがあります。自動オフ対策は、定期的に短く電流を流して、それを防ぎます。</p>
+    <table>
+      <tr><th>設定</th><th>LED</th><th>内容</th></tr>
+      <tr><td>弱（初期値）</td><td>緑 2 回</td><td>10 秒ごとに 50 ms。平均 約 0.75 mA。まずはこれで</td></tr>
+      <tr><td>強</td><td>緑 3 回</td><td>5 秒ごとに 200 ms。平均 約 6 mA。弱で切れるバッテリー向け</td></tr>
+      <tr><td>なし</td><td>赤 2 回</td><td>パソコンや、自動オフのない電源で使うとき</td></tr>
+    </table>
+    <h3>LED</h3>
+    <table>
+      <tr><th>表示</th><th>意味</th></tr>
+      <tr><td>1 秒ごとに緑</td><td>接続待ち</td></tr>
+      <tr><td>緑 2 秒</td><td>つながった</td></tr>
+      <tr><td>2 秒ごとに赤</td><td>つながっているが、キーボードがない</td></tr>
+      <tr><td>赤と緑の交互</td><td>USB チップのファームを更新中</td></tr>
+      <tr><td>赤の速い点滅</td><td>USB チップの異常（ファームを書き直す）</td></tr>
+      <tr><td>5 秒ごとに赤 1 回</td><td>電源の電圧が低い（4.5 V 未満）</td></tr>
+    </table>
+    <h3>自動の電源オフ</h3>
+    <p>10 分間どの機器ともつながらないと、KB Bridge は電源オフ（LED も消えます）になり、つないでいるキーボードの電源も切れます。<strong>LOW-I を押す</strong>か、<strong>キーボードを抜き挿しする</strong>と起動して、接続待ちに戻ります（起こすために押した LOW-I では、自動オフ対策の設定は変わりません）。PAIR では起動しません。</p>
+    <p class="muted">モバイルバッテリーで使っている場合、電源オフ中は自動オフ対策も止まるので、バッテリー側の電源も切れることがあります。そのときはバッテリー側を入れ直してください。</p>
+    <h3>Vial</h3>
+    <p>Vial 対応のキーボードなら、Bluetooth でつないだまま Vial でキーマップを変更できます。キーの入れ替えなどは KB Bridge ではなく、キーボード側（Vial）で設定します。</p>
+    <p>ただし Bluetooth 経由では反応が遅いので、Vial で設定するときは、キーボードを USB ケーブルでパソコンに直接つなぐのがおすすめです。</p>
+  </section>
+
+  <section id="trouble">
+    <h2>8. 困ったとき</h2>
+    <table>
+      <tr><th>症状</th><th>対処</th></tr>
+      <tr><td>LED がまったく光らない</td><td>HY0020 のはんだ付けを確かめてから、<a href="./">書き込みページ</a>でファームウェアを書き直す</td></tr>
+      <tr><td>「KB Bridge」が Bluetooth の一覧に出ない</td><td>PAIR を短く押して接続待ちにする。前につないだ機器にまだ登録されている場合は、その機器の Bluetooth 設定から KB Bridge を削除する</td></tr>
+      <tr><td>つながらない、すぐ切れる</td><td>PAIR を 3 秒押してペアリング情報を消し、接続先の機器からも KB Bridge を削除して、ペアリングし直す</td></tr>
+      <tr><td>モバイルバッテリーの電源が切れる</td><td>LOW-I を押して「強」（緑 3 回）にする</td></tr>
+      <tr><td>Linux（Ubuntu など）で、しばらく放置すると打てなくなる。Bluetooth を切ってつなぎ直すと直る</td><td>パソコン側の Bluetooth アダプターの省電力（USB autosuspend）が原因です。<code>cat /sys/module/btusb/parameters/enable_autosuspend</code> が <code>Y</code> なら、<code>echo 'options btusb enable_autosuspend=0' | sudo tee /etc/modprobe.d/btusb.conf</code> を実行してパソコンを再起動します（<code>N</code> になれば完了）</td></tr>
+      <tr><td>書き込みページで KB Bridge Update が出ない</td><td>CH559 が書き込まれていない可能性があります。<a href="#ch559">2. CH559 の書き込み</a>をやり直してください（HY0020 を付けたあとでもできます）。それでも出なければ、PAIR を押したままつないでいるか、ケーブルがデータ通信に対応しているかを確かめる</td></tr>
+    </table>
+  </section>
+
+  <section id="custom">
+    <h2>9. ケースを自作する</h2>
+    <p>付属のケースを使わず、自分でケースを作ることもできます。基板の 3D データと寸法図を用意しています。</p>
+    <ul>
+      <li><a href="hardware/kb_bridge_v0.7_pcba.stl" download>kb_bridge_v0.7_pcba.stl</a>（HY0020 を付けた状態の基板。単位は mm。原点は基板の中心、+Y が J1 側、Z = 0 が基板の下面）</li>
+      <li><a href="hardware/kb_bridge_v0.7_dimensions.pdf">kb_bridge_v0.7_dimensions.pdf</a>（外形、取り付け穴、コネクター、ボタン、LED、高さの寸法図）</li>
+    </ul>
+    <h3>押さえておく寸法</h3>
+    <table>
+      <tr><th>項目</th><th>寸法（mm）</th></tr>
+      <tr><td>基板</td><td>56.0 × 26.0 × 1.6、角 R2.0</td></tr>
+      <tr><td>取り付け穴</td><td>φ2.2（M2）× 4、中心から (±25.5, ±10.5)</td></tr>
+      <tr><td>J1（電源・パソコン）</td><td>USB-C の差し込み口。基板の端から 1.3 出る。高さは基板の下面から 4.85 まで</td></tr>
+      <tr><td>J2（キーボード）</td><td>USB-C のプラグ。基板の端から 11.75 出る</td></tr>
+      <tr><td>部品面の高さ</td><td>J1 を除くとボタンがいちばん高く、下面から 3.54。ボタンは部品面側から押す</td></tr>
+      <tr><td>裏面</td><td>HY0020 が下面から 2.14 下まで出る。2.9 まで空けておく</td></tr>
+    </table>
+    <h3>5V / GND ピンからの給電</h3>
+    <p>J1 の近くにある 2 つの穴（シルク「+5V」「GND」、2.54 mm 間隔）からも電源を入れられます。ケースの中に電池や電源基板を入れる場合に使えます。</p>
+    <ul>
+      <li>電圧は 4.5〜5.5 V。J1 と同じ入力につながっていて、逆につないでも壊れない保護が入っています。</li>
+      <li>J1 とこのピンに、同時に別の電源をつながないでください。</li>
+    </ul>
+    <h3>ケースを作るときの注意</h3>
+    <ul>
+      <li>LED（部品面、中心から (−14.0, 8.0)）の光が見える穴を空けてください。</li>
+      <li>HY0020 のモジュール（裏面、J1 側）の近くには金属を置かないでください。Bluetooth の電波が弱くなります。</li>
+      <li>PAIR と LOW-I のボタンを押せるようにしてください。</li>
+    </ul>
+  </section>
+
+  <section id="source">
+    <h2>10. ソースコード</h2>
+    <p>ファームウェアと書き込みページのソースコードは <a href="https://github.com/darakuneko/kb_bridge">GitHub（darakuneko/kb_bridge）</a>で公開しています（MIT ライセンス）。困ったことや、やりたいことがあれば、自由に変更して使ってください。いい機能ができたら、ぜひプルリクエストをください。</p>
+  </section>
+
+  <footer class="muted">
+    <p><a href="./">ファームウェア書き込みページ</a> ・ <a href="ch559.html">CH559 の書き込みページ（最初の 1 回）</a></p>
+  </footer>
+</main>
+</body>
+</html>
