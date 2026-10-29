@@ -32,8 +32,6 @@ const TEXT = {
     noFirmware: '（公開中のファームウェアはありません）',
     latest: '（最新）',
     footer: 'Chrome / Edge（Windows・macOS・Linux）で動きます。書き込みはすべてこのブラウザの中で行われ、ファイルや情報が外部に送られることはありません。',
-    guideLink: 'ビルドガイド（はんだ付け・組み立て・使い方）→',
-    ch559Link: '組み立ての最初に: CH559 の書き込み（HY0020 を付ける前に 1 回）→',
   },
   en: {
     lead: 'Write KB Bridge firmware from your browser over USB. Nothing to install.',
@@ -61,8 +59,6 @@ const TEXT = {
     noFirmware: '(no firmware published)',
     latest: ' (latest)',
     footer: 'Works in Chrome / Edge on Windows, macOS and Linux. Everything happens inside this browser; no files or data are sent anywhere.',
-    guideLink: 'Build guide (soldering, assembly, usage) →',
-    ch559Link: 'First step of the build: write the CH559 (once, before fitting the HY0020) →',
   },
 };
 
@@ -82,7 +78,6 @@ function applyText() {
   document.documentElement.lang = lang;
   for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
   $('lang').textContent = lang === 'ja' ? 'English' : '日本語';
-  $('guide').href = lang === 'ja' ? 'guide_ja.html' : 'guide_en.html';
   $('ch559').href = `ch559.html?lang=${lang}`;
   fillBoards();
 }

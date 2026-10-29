@@ -69,6 +69,7 @@ button { font: inherit; cursor: pointer; }
 .status.error { color: var(--error); }
 .status.ok { color: var(--ok); font-weight: 600; }
 footer { margin-top: 24px; }
+.links { margin: 8px 0 0; padding-left: 20px; }
 a { color: var(--accent); }
 @media (max-width: 480px) {
   .field { grid-template-columns: 1fr; gap: 4px; }
