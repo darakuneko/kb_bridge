@@ -5,16 +5,16 @@
       "name": "KB Bridge v0.7",
       "firmware": [
         {
-          "version": "0.3.0",
+          "version": "0.3.1",
           "date": "2026-10-29",
-          "file": "firmware/v0.7/kb_bridge_v0.7_0.3.0_20261029.zip",
+          "file": "firmware/v0.7/kb_bridge_v0.7_0.3.1_20261029.zip",
           "ch559": {
-            "file": "firmware/v0.7/kb_bridge_ch559_v0.7_0.3.0_20261029.bin",
-            "build_id": "0xCC95E801"
+            "file": "firmware/v0.7/kb_bridge_ch559_v0.7_0.3.1_20261029.bin",
+            "build_id": "0xFF329865"
           },
           "notes": {
-            "ja": "10 分間どこにもつながらないと電源オフ（LOW-I かキーボードの抜き挿しで起動）。USB の ID を KB Bridge 専用（7A79:1576）に変更。Vial に見える ID もキーボードではなく KB Bridge のものに。",
-            "en": "Powers off after 10 minutes without a connection (LOW-I or plugging / unplugging the keyboard wakes it). Dedicated USB ID (7A79:1576); Vial now sees KB Bridge's ID instead of the keyboard's."
+            "ja": "10 分間どこにもつながらないと電源オフ（LOW-I かキーボードの抜き挿しで起動）。USB の ID を KB Bridge 専用（7A79:1576）に。Vial に見える ID も KB Bridge のものに。",
+            "en": "Powers off after 10 minutes without a connection (LOW-I or plugging / unplugging the keyboard wakes it). Dedicated USB ID (7A79:1576), also shown to Vial."
           }
         }
       ]

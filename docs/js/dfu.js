@@ -13,6 +13,9 @@ const FLASH_PAGE_SIZE = 4096;
 const FLASH_PAGE_ERASE_S = 0.0897;
 const FLASH_PAGE_WRITE_S = (FLASH_PAGE_SIZE / 4) * 0.0001;
 const ACK_TIMEOUT_MS = 1000;
+// A packet without an ACK is sent again with the same sequence number: the bootloader's HCI layer
+// drops a duplicate and only acknowledges it, so a lost byte costs a retry instead of the update.
+const SEND_ATTEMPTS = 4;
 
 export function crc16(bytes, crc = 0xffff) {
   for (const b of bytes) {
@@ -99,6 +102,8 @@ class AckReader {
     }
   }
 
+  discard() { this.buf.length = 0; }
+
   // Bytes up to the second 0xC0 (one SLIP frame), or null after the timeout.
   async getAck() {
     const deadline = Date.now() + ACK_TIMEOUT_MS;
@@ -148,8 +153,14 @@ export async function flash(port, bin, dat, onProgress = () => {}) {
     const steps = dfuPackets(bin, dat);
     onProgress(0, bin.length, 'erase');
     for (const s of steps) {
-      await writer.write(s.pkt);
-      const ack = await acks.getAck();
+      // START erases the application area: no answer there means no bootloader, not a lost byte
+      const attempts = s.kind === 'start' ? 1 : SEND_ATTEMPTS;
+      let ack = null;
+      for (let a = 0; a < attempts && ack === null; a++) {
+        acks.discard();                     // a late ACK of an earlier try must not count for this one
+        await writer.write(s.pkt);
+        ack = await acks.getAck();
+      }
       if (ack === null) {
         throw new Error(s.kind === 'start' ? 'NO_BOOTLOADER' : 'NO_ACK');
       }
