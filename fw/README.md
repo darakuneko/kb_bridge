@@ -74,7 +74,7 @@ The CH559 only relays. When a device attaches it sends the HID interfaces and re
 | Feature | |
 |---|---|
 | BLE HID | Keyboard (6KRO, boot protocol), consumer, system, mouse. NKRO and multiple interfaces on the USB side are merged and sent as 6KRO |
-| Vial | A second HID service (usage page 0xFF60, 32 bytes) relayed as is to the keyboard's raw HID. DIS serial number = `vial:f64c2b3c:XXXXXX`. ATT MTU 64 (with the default 23, 32-byte reports are split into 20+12 and the host drops them). The zero-length packet a keyboard sends after a reply is dropped. DIS PnP ID = KB Bridge's own 7A79:1576 (the attached keyboard's id is not passed on; `/kbb_pnp` saved by 0.2.0 is deleted at start-up). While Vial talks (10 s after the last request) slave latency is off (otherwise requests arrive bunched, Unlock polls come less than 100 ms apart and the count resets) |
+| Vial | A second HID service (usage page 0xFF60, 32 bytes) relayed as is to the keyboard's raw HID. DIS serial number = `vial:f64c2b3c:XXXXXX`. ATT MTU 64 (with the default 23, 32-byte reports are split into 20+12 and the host drops them). The zero-length packet a keyboard sends after a reply is dropped. DIS PnP ID = KB Bridge's own 7A79:1576 (the attached keyboard's id is not passed on). While Vial talks (10 s after the last request) slave latency is off (otherwise requests arrive bunched, Unlock polls come less than 100 ms apart and the count resets) |
 | Keyboard LEDs | Host LED output → the keyboard's LED output reports (all of them, including ones with a report id) |
 | Keyboard power | VBUS_KB is switched on only when CC shows an Rd (0.44 V). A PC or charger plugged into J2 gets no 5 V |
 | Keep-alive | LOW-I cycles weak → strong → off (saved, default weak). Strong: 200 ms every 5 s at ~150 mA (~6 mA average). Weak: 50 ms every 10 s (~0.75 mA average, for power banks in their own low-current mode). Makers differ: tune `KEEPALIVE_WEAK_*` |
@@ -84,7 +84,6 @@ The CH559 only relays. When a device attaches it sends the HID interfaces and re
 ## Not implemented / later
 
 - Switching between several hosts, NKRO BLE reports, battery service
-- The update CDC's VID/PID and the BLE PnP ID are both 7A79:1576 (`USB_VID` / `USB_PID`, config.h and ch559/cdc.c). CH559 firmware 0.2.0 and older uses 1209:0001, so the updater page accepts both
 
 ## About licenses
 

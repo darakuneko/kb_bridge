@@ -2,12 +2,8 @@ import { flash } from './dfu.js';
 import { readDfuPackage } from './zip.js';
 
 // KB Bridge update mode: the CH559 shows up as this CDC serial port (fw/ch559/cdc.c).
-// KB Bridge update-mode serial. 1209:0001 = firmware 0.2.0 and older (pid.codes test id); the
-// update to a newer firmware is written while the old CH559 firmware is still running.
-const USB_FILTERS = [
-  { usbVendorId: 0x7A79, usbProductId: 0x1576 },
-  { usbVendorId: 0x1209, usbProductId: 0x0001 },
-];
+// KB Bridge update-mode serial
+const USB_FILTERS = [{ usbVendorId: 0x7A79, usbProductId: 0x1576 }];
 
 const TEXT = {
   ja: {

@@ -2,6 +2,8 @@
 
 Firmware, browser-based flashing pages and the build guide for KB Bridge, an adapter that turns a wired QMK / Vial keyboard into a Bluetooth LE keyboard.
 
+Flashing pages and build guide: https://darakuneko.github.io/kb_bridge/
+
 | Path | Contents |
 |---|---|
 | `fw/` | Firmware (CH559L USB host + nRF52832 BLE). Details in [fw/README.md](fw/README.md) |
@@ -13,7 +15,7 @@ Firmware, browser-based flashing pages and the build guide for KB Bridge, an ada
 
 ## Flashing pages
 
-- Normal update (`index.html`): runs the same procedure as `adafruit-nrfutil dfu serial --singlebank` over Web Serial. Plugging the board in with PAIR held makes the CH559 a USB serial port, "KB Bridge Update" (7A79:1576; 1209:0001 on firmware 0.2.0 and older), and the page writes the nRF through it. The nRF firmware carries the CH559 firmware and updates it on the next start, so this is the only step for users.
+- Normal update (`index.html`): runs the same procedure as `adafruit-nrfutil dfu serial --singlebank` over Web Serial. Plugging the board in with PAIR held makes the CH559 a USB serial port, "KB Bridge Update" (7A79:1576), and the page writes the nRF through it. The nRF firmware carries the CH559 firmware and updates it on the next start, so this is the only step for users.
 - CH559 first flash (`ch559.html`): with JP1 (BOOT) shorted, the CH559 starts in its USB ISP mode (4348:55E0) and the page writes it over WebUSB (same as `fw/tools/flash_ch559.sh`). Done once at the start of the build; it also works with the HY0020 fitted. On Windows, install the WinUSB driver with Zadig first.
 - Both run in Chrome / Edge on a computer (Windows, macOS, Linux). Not in Safari, Firefox or on phones.
 - Static pages, no build step and no external libraries.
@@ -32,10 +34,6 @@ cd docs && python3 -m http.server 8000     # open http://localhost:8000 in Chrom
 fw/.venv/bin/python tools/test/ref_packets.py fw/build/kb_bridge_dfu.zip /tmp/ref.bin
 node tools/test/compare.mjs fw/build/kb_bridge_dfu.zip /tmp/ref.bin     # MATCH = same as nrfutil
 ```
-
-## GitHub Pages
-
-In the repository's Settings → Pages choose "Deploy from a branch", `main`, `/docs`. `docs/.nojekyll` makes Pages serve the files as they are.
 
 ## Modifying and pull requests
 
