@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KB Bridge Build Guide</title>
+<link rel="stylesheet" href="style.css?v=3">
+</head>
+<body>
+<main class="doc">
+  <header>
+    <h1>KB Bridge Build Guide</h1>
+    <a href="guide.html" lang="ja">日本語</a>
+  </header>
+  <p class="lead">KB Bridge is an adapter that turns a wired QMK / Vial keyboard into a Bluetooth LE keyboard. This guide covers soldering the HY0020 (an nRF52832 BLE module), writing the firmware and assembling the case.</p>
+  <nav class="toc">
+    <a href="#parts">1. What you need</a>
+    <a href="#ch559">2. Write the CH559</a>
+    <a href="#solder">3. Solder the HY0020</a>
+    <a href="#firmware">4. Write the firmware</a>
+    <a href="#check">5. Check it works</a>
+    <a href="#case">6. Assemble the case</a>
+    <a href="#use">7. Using it</a>
+    <a href="#trouble">8. Troubleshooting</a>
+    <a href="#custom">9. Make your own case</a>
+    <a href="#source">10. Source code</a>
+  </nav>
+
+  <section id="parts">
+    <h2>1. What you need</h2>
+    <table>
+      <tr><th>Part</th><th>Qty</th><th>Notes</th></tr>
+      <tr><td>KB Bridge board</td><td>1</td><td>Everything but the HY0020 is fitted. The USB chip (CH559) firmware is written in step 2</td></tr>
+      <tr><td>AE-HY0020-DIP (Akizuki Denshi)</td><td>1</td><td>DIP carrier kit for the BLE module</td></tr>
+      <tr><td>Thin pin header (1 row, 10 pins or more)</td><td>1</td><td>Thin enough for the AE-HY0020-DIP holes. Cut a longer one to length with nippers</td></tr>
+      <tr><td>Case (top and bottom)</td><td>1 set</td><td>Included. 3D printed, heat-set inserts already fitted</td></tr>
+      <tr><td>M2 × 8 mm screws</td><td>4</td><td>Included. Driven in from the top</td></tr>
+    </table>
+    <p>Tools: soldering iron, solder, nippers, a jumper wire (to short JP1; tweezers work too), masking tape, a USB-C cable, a computer that runs Chrome or Edge.</p>
+  </section>
+
+  <section id="ch559">
+    <h2>2. Write the CH559</h2>
+    <p><strong>Before soldering the HY0020</strong>, write the firmware into the USB chip (CH559) with the <a href="ch559.html">CH559 flashing page</a>, in Chrome or Edge on a computer.</p>
+    <ol class="steps">
+      <li>Keep the two JP1 holes (silkscreen "BOOT") shorted, for example with the end of a jumper wire, while you plug J1 (the USB-C receptacle) into the computer.
+        <figure class="diagram"><img src="img/buttons.svg" style="max-width:100%;height:auto" alt="Component side: position of JP1 (BOOT)"></figure></li>
+      <li>Press "Write" on the page, choose the WCH device (4348:55E0) in the list and press "Connect".</li>
+      <li>When it says "Done", unplug the USB cable and remove the JP1 short.</li>
+    </ol>
+    <p class="muted">On Windows, install the WinUSB driver with Zadig once first (the flashing page explains how). Without the HY0020 the LED stays dark after writing. To check it, plug it in while holding PAIR: a "KB Bridge Update" serial port should appear on the computer.</p>
+  </section>
+
+  <section id="solder">
+    <h2>3. Solder the HY0020</h2>
+    <p>Orientation: the AE-HY0020-DIP sits directly on the <strong>bottom side</strong> of the board (the side with fewer parts), with no gap. Point the HY0020 module (the part with the metal lid) <strong>towards J1 (the USB-C receptacle, silkscreen "BATTERY / PC")</strong> and line it up with the outline on the bottom silkscreen.</p>
+    <ol class="steps">
+      <li>Push the thin pin header through both the KB Bridge board and the AE-HY0020-DIP <strong>from the component side</strong>. The plastic part stays on the component side.
+        <figure><img src="img/solder_1.jpg" alt="AE-HY0020-DIP on the bottom side with the thin pin header pushed through" loading="lazy"></figure></li>
+      <li>Hold things in place with masking tape on the side opposite the one you solder: the AE-HY0020-DIP on the bottom side, the header's plastic on the component side.
+        <figure><img src="img/solder_2.jpg" alt="Bottom side: AE-HY0020-DIP held with masking tape" loading="lazy"><img src="img/solder_3.jpg" alt="Component side: thin pin header held with masking tape" loading="lazy"></figure></li>
+      <li>Solder the bottom side (the AE-HY0020-DIP side). Cut the protruding pins with nippers and tidy up the joints.
+        <figure><img src="img/solder_4.jpg" alt="Bottom side soldered" loading="lazy"><img src="img/solder_5.jpg" alt="Bottom side pins cut and tidied" loading="lazy"></figure></li>
+      <li>On the component side, cut the pins together with the plastic. Leave <strong>2 mm or less</strong> sticking out so they do not touch the case.
+        <figure><img src="img/solder_6.jpg" alt="Cutting the component-side pins together with the plastic" loading="lazy"><img src="img/solder_7.jpg" alt="Cutting the pins" loading="lazy"></figure></li>
+      <li>Solder the component side too. <strong>Both sides</strong> need soldering.
+        <figure><img src="img/solder_8.jpg" alt="Component side soldered" loading="lazy"></figure></li>
+    </ol>
+    <p class="muted">In the case, the module side (the bottom side) faces away from everything else, which keeps the BLE signal strong.</p>
+  </section>
+
+  <section id="firmware">
+    <h2>4. Write the firmware</h2>
+    <p>Use the <a href="./">firmware updater</a> in Chrome or Edge on a computer.</p>
+    <ol class="steps">
+      <li><strong>Hold the PAIR button</strong> and plug J1 (the USB-C receptacle) into the computer. You can let go once it is plugged in.</li>
+      <li>Press "Write" on the page, choose "KB Bridge Update" in the list and press "Connect".</li>
+      <li>When it says "Done", unplug the USB cable and plug it in again without pressing PAIR.</li>
+    </ol>
+    <p class="muted">On the first start the LED may alternate red and green for a few seconds: the CH559 firmware is being updated as well. Just wait. Later updates use the same steps.</p>
+  </section>
+
+  <section id="check">
+    <h2>5. Check it works</h2>
+    <ol class="steps">
+      <li>Plug J1 into a USB power source (a computer or a power bank) without pressing PAIR. A short green blink every second means it is waiting for a connection.</li>
+      <li>Pair with "KB Bridge" in the Bluetooth settings of your computer or phone. Once connected, the LED stays green for 2 seconds.</li>
+      <li>Plug the keyboard into J2 (the USB-C plug). The keyboard works after about 2 seconds.</li>
+    </ol>
+  </section>
+
+  <section id="case">
+    <h2>6. Assemble the case</h2>
+    <ol class="steps">
+      <li>Place the board in the bottom case, with J1 and J2 lined up with their openings.</li>
+      <li>Put the top case on and fasten it with the four included M2 × 8 mm screws. Do not overtighten.
+        <figure><img src="img/case_1.jpg" alt="Assembled case: the side with the four screws and the LED hole" loading="lazy"></figure></li>
+    </ol>
+    <p class="muted">In use, the flat face (the bottom of the bottom case) faces up. PAIR and LOW-I can be pressed through the case from the top.</p>
+    <figure><img src="img/case_2.jpg" alt="In use: flat face up" loading="lazy"></figure>
+  </section>
+
+  <section id="use">
+    <h2>7. Using it</h2>
+    <h3>Buttons</h3>
+    <p>PAIR and LOW-I can be pressed through the case from the top. Their positions are shown below.</p>
+    <figure class="diagram"><img src="img/buttons.svg" style="max-width:100%;height:auto" alt="Component side: PAIR and LOW-I buttons, JP1 (BOOT)"></figure>
+    <table>
+      <tr><th>Button</th><th>Action</th><th>Result</th></tr>
+      <tr><td>PAIR</td><td>Short press</td><td>Start waiting for a connection (to pair with another device)</td></tr>
+      <tr><td>PAIR</td><td>Hold 3 s</td><td>Forget all pairings (LED red ×3)</td></tr>
+      <tr><td>PAIR</td><td>Hold while plugging in USB</td><td>Firmware update mode</td></tr>
+      <tr><td>LOW-I</td><td>Press</td><td>Cycle the power-bank keep-alive: weak → strong → off (saved; default weak)</td></tr>
+    </table>
+    <h3>Power-bank keep-alive (LOW-I)</h3>
+    <p>KB Bridge draws so little current when idle that a power bank may decide it is not in use and switch itself off. The keep-alive draws a short burst of current now and then to prevent that.</p>
+    <table>
+      <tr><th>Setting</th><th>LED</th><th>What it does</th></tr>
+      <tr><td>Weak (default)</td><td>Green ×2</td><td>50 ms every 10 s, ~0.75 mA on average. Try this first</td></tr>
+      <tr><td>Strong</td><td>Green ×3</td><td>200 ms every 5 s, ~6 mA on average. For power banks that still switch off with weak</td></tr>
+      <tr><td>Off</td><td>Red ×2</td><td>On a computer or a supply without auto-off</td></tr>
+    </table>
+    <h3>LED</h3>
+    <table>
+      <tr><th>Pattern</th><th>Meaning</th></tr>
+      <tr><td>Green every second</td><td>Waiting for a connection</td></tr>
+      <tr><td>Green for 2 s</td><td>Connected</td></tr>
+      <tr><td>Red every 2 s</td><td>Connected, but no keyboard</td></tr>
+      <tr><td>Red and green alternating</td><td>Updating the USB chip firmware</td></tr>
+      <tr><td>Fast red blinking</td><td>USB chip fault (write the firmware again)</td></tr>
+      <tr><td>One red blink every 5 s</td><td>Supply voltage low (below 4.5 V)</td></tr>
+    </table>
+    <h3>Automatic power-off</h3>
+    <p>After 10 minutes without a connection to any device, KB Bridge powers off (the LED goes dark) and so does the attached keyboard. <strong>Press LOW-I</strong> or <strong>unplug and replug the keyboard</strong> to start it again; it goes back to waiting for a connection (the LOW-I press that wakes it does not change the keep-alive setting). PAIR does not wake it.</p>
+    <p class="muted">On a power bank, the keep-alive stops while KB Bridge is off, so the power bank may switch off too. Switch the power bank back on in that case.</p>
+    <h3>Vial</h3>
+    <p>With a Vial-enabled keyboard you can change the keymap in Vial while connected over Bluetooth. Key remapping is done on the keyboard (in Vial), not in KB Bridge.</p>
+    <p>Vial responds slowly over Bluetooth, though, so for configuring it is better to connect the keyboard to the computer directly with a USB cable.</p>
+  </section>
+
+  <section id="trouble">
+    <h2>8. Troubleshooting</h2>
+    <table>
+      <tr><th>Problem</th><th>What to do</th></tr>
+      <tr><td>The LED never lights</td><td>Check the HY0020 soldering, then write the firmware again with the <a href="./">updater</a></td></tr>
+      <tr><td>"KB Bridge" does not show up in the Bluetooth list</td><td>Short-press PAIR to start waiting for a connection. If a device you paired before still has KB Bridge registered, remove it in that device's Bluetooth settings</td></tr>
+      <tr><td>It will not connect, or keeps disconnecting</td><td>Hold PAIR for 3 s to forget the pairings, remove KB Bridge on the other device as well, and pair again</td></tr>
+      <tr><td>The power bank switches off</td><td>Press LOW-I to choose "strong" (green ×3)</td></tr>
+      <tr><td>On Linux (Ubuntu etc.) typing stops working after a while; reconnecting Bluetooth fixes it</td><td>The computer's Bluetooth adapter power saving (USB autosuspend) causes this. If <code>cat /sys/module/btusb/parameters/enable_autosuspend</code> prints <code>Y</code>, run <code>echo 'options btusb enable_autosuspend=0' | sudo tee /etc/modprobe.d/btusb.conf</code> and restart the computer (it should then print <code>N</code>)</td></tr>
+      <tr><td>Writing stops part way or fails</td><td>Unplug, plug in again while holding PAIR and write again. An interrupted write is fixed by writing again. If it keeps failing, clone the <a href="https://github.com/darakuneko/kb_bridge">GitHub repository</a> and write from your own computer (see "Local testing" in the README)</td></tr>
+      <tr><td>"KB Bridge Update" does not appear on the updater</td><td>The CH559 may not have been written. Redo <a href="#ch559">2. Write the CH559</a> (this also works with the HY0020 fitted). If it still does not appear, check that you hold PAIR while plugging in and that the cable carries data</td></tr>
+    </table>
+  </section>
+
+  <section id="custom">
+    <h2>9. Make your own case</h2>
+    <p>You can also design your own case instead of using the included one. A 3D model and a dimension drawing of the board are provided.</p>
+    <ul>
+      <li><a href="hardware/kb_bridge_v0.7_pcba.stl" download>kb_bridge_v0.7_pcba.stl</a> (the board with the HY0020 fitted, in mm. Origin at the board centre, +Y towards J1, Z = 0 at the bottom face of the board)</li>
+      <li><a href="hardware/kb_bridge_v0.7_dimensions.pdf">kb_bridge_v0.7_dimensions.pdf</a> (outline, mounting holes, connectors, buttons, LED, heights)</li>
+    </ul>
+    <h3>Key dimensions</h3>
+    <table>
+      <tr><th>Item</th><th>Dimension (mm)</th></tr>
+      <tr><td>Board</td><td>56.0 × 26.0 × 1.6, corner radius 2.0</td></tr>
+      <tr><td>Mounting holes</td><td>φ2.2 (M2) × 4 at (±25.5, ±10.5) from the centre</td></tr>
+      <tr><td>J1 (power / computer)</td><td>USB-C receptacle, 1.3 beyond the board edge, up to 4.85 above the bottom face</td></tr>
+      <tr><td>J2 (keyboard)</td><td>USB-C plug, 11.75 beyond the board edge</td></tr>
+      <tr><td>Component-side height</td><td>Apart from J1 the buttons are tallest, 3.54 above the bottom face. They are pressed from the component side</td></tr>
+      <tr><td>Bottom side</td><td>The HY0020 reaches 2.14 below the bottom face. Keep 2.9 clear</td></tr>
+    </table>
+    <h3>Power through the 5V / GND pins</h3>
+    <p>The two holes near J1 (silkscreen "+5V" and "GND", 2.54 mm pitch) can also supply power, for example from a battery or a power board inside your case.</p>
+    <ul>
+      <li>About 4.5–5.5 V as a guide. They connect to the same input as J1, which is protected against reverse polarity.</li>
+      <li>Powering through these pins is not guaranteed to work. Check it with your actual supply before relying on it.</li>
+      <li>Do not connect different power sources to J1 and these pins at the same time.</li>
+    </ul>
+    <h3>Notes for your case</h3>
+    <ul>
+      <li>Leave a hole where the LED (component side, (−14.0, 8.0) from the centre) can be seen.</li>
+      <li>Keep metal away from the HY0020 module (bottom side, J1 end); it weakens the Bluetooth signal.</li>
+      <li>Make sure PAIR and LOW-I can be pressed.</li>
+    </ul>
+  </section>
+
+  <section id="source">
+    <h2>10. Source code</h2>
+    <p>The source code of the firmware and the flashing pages is on <a href="https://github.com/darakuneko/kb_bridge">GitHub (darakuneko/kb_bridge)</a> under the MIT license. If something bothers you or you want KB Bridge to do something else, change it as you like. If you build a good feature, pull requests are welcome.</p>
+  </section>
+
+  <footer class="muted">
+    <p><a href="./">Firmware updater</a> · <a href="ch559.html">CH559 flashing page (once, at the start)</a></p>
+  </footer>
+</main>
+</body>
+</html>

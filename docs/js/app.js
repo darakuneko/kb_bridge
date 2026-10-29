@@ -61,7 +61,7 @@ const TEXT = {
     noFirmware: '(no firmware published)',
     latest: ' (latest)',
     footer: 'Works in Chrome / Edge on Windows, macOS and Linux. Everything happens inside this browser; no files or data are sent anywhere.',
-    guideLink: 'Build guide (soldering, assembly, usage; Japanese) →',
+    guideLink: 'Build guide (soldering, assembly, usage) →',
     ch559Link: 'First step of the build: write the CH559 (once, before fitting the HY0020) →',
   },
 };
@@ -81,6 +81,7 @@ function applyText() {
   document.documentElement.lang = lang;
   for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
   $('lang').textContent = lang === 'ja' ? 'English' : '日本語';
+  $('guide').href = lang === 'ja' ? 'guide.html' : 'guide_en.html';
   fillBoards();
 }
 
