@@ -16,19 +16,6 @@
             "ja": "10 分間どこにもつながらないと電源オフ（LOW-I かキーボードの抜き挿しで起動）。USB の ID を KB Bridge 専用（7A79:1576）に変更。Vial に見える ID もキーボードではなく KB Bridge のものに。",
             "en": "Powers off after 10 minutes without a connection (LOW-I or plugging / unplugging the keyboard wakes it). Dedicated USB ID (7A79:1576); Vial now sees KB Bridge's ID instead of the keyboard's."
           }
-        },
-        {
-          "version": "0.2.0",
-          "date": "2026-10-27",
-          "file": "firmware/v0.7/kb_bridge_v0.7_0.2.0_20261027.zip",
-          "ch559": {
-            "file": "firmware/v0.7/kb_bridge_ch559_v0.7_0.2.0_20261027.bin",
-            "build_id": "0x08594801"
-          },
-          "notes": {
-            "ja": "v0.7 基板の最初の公開版。LOW-I の初期値は弱（緑 2 回）、強は緑 3 回。",
-            "en": "First release for the v0.7 board. LOW-I defaults to weak (2 green blinks); strong is 3 green blinks."
-          }
         }
       ]
     }
