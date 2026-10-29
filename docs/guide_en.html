@@ -149,6 +149,14 @@
     <h3>Automatic power-off</h3>
     <p>After 10 minutes without a connection to any device, KB Bridge powers off (the LED goes dark) and so does the attached keyboard. <strong>Press LOW-I</strong> or <strong>unplug and replug the keyboard</strong> to start it again; it goes back to waiting for a connection (the LOW-I press that wakes it does not change the keep-alive setting). PAIR does not wake it.</p>
     <p class="muted">On a power bank, the keep-alive stops while KB Bridge is off, so the power bank may switch off too. Switch the power bank back on in that case.</p>
+    <h3>Limitations</h3>
+    <ul>
+      <li>It connects to one device at a time. There is no button to switch between devices: to use it with another one, turn off Bluetooth on the device it is connected to.</li>
+      <li>One keyboard plugs directly into J2. USB hubs are not supported.</li>
+      <li>Up to 6 keys at once (an NKRO keyboard is sent as 6KRO over Bluetooth).</li>
+      <li>Tested with iPhone, macOS and Ubuntu. Windows and Android have not been tested.</li>
+      <li>There is no key remapping in KB Bridge. Change the keymap on the keyboard (Vial etc.).</li>
+    </ul>
     <h3>Vial</h3>
     <p>With a Vial-enabled keyboard you can change the keymap in Vial while connected over Bluetooth. Key remapping is done on the keyboard (in Vial), not in KB Bridge.</p>
     <p>Vial responds slowly over Bluetooth, though, so for configuring it is better to connect the keyboard to the computer directly with a USB cable.</p>
