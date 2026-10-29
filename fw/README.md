@@ -1,6 +1,6 @@
 # KB Bridge firmware
 
-Turns a wired USB keyboard (J2) into a BLE keyboard. Firmware for two microcontrollers:
+Turns a wired USB-C keyboard (J2) into a BLE keyboard. Firmware for two microcontrollers:
 
 | | Role | Toolchain | Path |
 |---|---|---|---|
