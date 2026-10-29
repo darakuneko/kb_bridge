@@ -3,8 +3,6 @@ import { USB_FILTER, flashCh559 } from './wchisp.js';
 const TEXT = {
   ja: {
     lead: '組み立ての最初に 1 回だけ、USB チップ（CH559）にファームウェアを書き込むページです。HY0020 をはんだ付けする前に行ってください。以後の更新は通常の更新ページで CH559 も自動で書き換わるので、ここは使いません。',
-    back: '← 通常の更新ページ',
-    guideLink: 'ビルドガイドの手順',
     unsupported: 'このブラウザは WebUSB に対応していません。パソコンの Chrome か Edge で開いてください。',
     s1: '1. ファームウェアを選ぶ',
     board: '基板',
@@ -35,8 +33,6 @@ const TEXT = {
   },
   en: {
     lead: 'Write the USB chip (CH559) firmware once, at the start of the build, before the HY0020 is soldered on. Later updates go through the normal update page, which updates the CH559 as well.',
-    back: '← Normal update page',
-    guideLink: 'Steps in the build guide',
     unsupported: 'This browser does not support WebUSB. Open this page in Chrome or Edge on a computer.',
     s1: '1. Choose the firmware',
     board: 'Board',
@@ -83,7 +79,6 @@ function applyText() {
   document.documentElement.lang = lang;
   for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
   $('lang').textContent = lang === 'ja' ? 'English' : '日本語';
-  $('guide').href = lang === 'ja' ? 'guide_ja.html#ch559' : 'guide_en.html#ch559';
   $('back').href = `./?lang=${lang}`;
   fillBoards();
 }
