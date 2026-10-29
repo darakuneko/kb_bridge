@@ -2,7 +2,9 @@
 
 Firmware, browser-based flashing pages and the build guide for KB Bridge, an adapter that turns a wired QMK / Vial keyboard into a Bluetooth LE keyboard.
 
-Flashing pages and build guide: https://darakuneko.github.io/kb_bridge/
+- Firmware updater: https://darakuneko.github.io/kb_bridge/
+- CH559 first flash: https://darakuneko.github.io/kb_bridge/ch559.html
+- Build guide (Japanese): https://darakuneko.github.io/kb_bridge/guide.html
 
 | Path | Contents |
 |---|---|
