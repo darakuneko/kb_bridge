@@ -48,7 +48,7 @@
       <li>ページの「書き込む」を押し、一覧から WCH のデバイス（4348:55E0）を選んで「接続」します。</li>
       <li>「完了」と出たら USB を抜き、JP1 のショートをやめます。</li>
     </ol>
-    <p class="muted">Windows では、最初の 1 回だけ Zadig で WinUSB ドライバーを入れる必要があります（書き込みページに説明があります）。HY0020 がまだないので、書き込んでも LED は光りません。確かめるなら、PAIR を押しながらつないで、パソコンに「KB Bridge Update」（シリアルポート）が出れば OK です。</p>
+    <p class="muted">Windows では、最初の 1 回だけ Zadig で WinUSB ドライバーを入れる必要があります（CH559 の書き込みページに説明があります）。HY0020 がまだないので、書き込んでも LED は光りません。確かめるなら、PAIR を押しながらつないで、パソコンに「KB Bridge Update」（シリアルポート）が出れば OK です。</p>
   </section>
 
   <section id="solder">
@@ -142,13 +142,13 @@
     <h2>8. 困ったとき</h2>
     <table>
       <tr><th>症状</th><th>対処</th></tr>
-      <tr><td>LED がまったく光らない</td><td>HY0020 のはんだ付けを確かめてから、<a href="./?lang=ja">書き込みページ</a>でファームウェアを書き直す</td></tr>
+      <tr><td>LED がまったく光らない</td><td>HY0020 のはんだ付けを確かめてから、<a href="./?lang=ja">ファームウェア書き込みページ</a>でファームウェアを書き直す</td></tr>
       <tr><td>「KB Bridge」が Bluetooth の一覧に出ない</td><td>PAIR を短く押して接続待ちにする。前につないだ機器にまだ登録されている場合は、その機器の Bluetooth 設定から KB Bridge を削除する</td></tr>
       <tr><td>つながらない、すぐ切れる</td><td>PAIR を 3 秒押してペアリング情報を消し、接続先の機器からも KB Bridge を削除して、ペアリングし直す</td></tr>
       <tr><td>モバイルバッテリーの電源が切れる</td><td>LOW-I を押して「強」（緑 3 回）にする</td></tr>
       <tr><td>Linux（Ubuntu など）で、しばらく放置すると打てなくなる。Bluetooth を切ってつなぎ直すと直る</td><td>パソコン側の Bluetooth アダプターの省電力（USB autosuspend）が原因です。<code>cat /sys/module/btusb/parameters/enable_autosuspend</code> が <code>Y</code> なら、<code>echo 'options btusb enable_autosuspend=0' | sudo tee /etc/modprobe.d/btusb.conf</code> を実行してパソコンを再起動します（<code>N</code> になれば完了）</td></tr>
       <tr><td>書き込みが途中で止まる、エラーになる</td><td>抜いて、PAIR を押したままつなぎ直し、もう一度書き込みます。途中で止まっても、書き直せば元に戻ります。何回か試してもうまくいかないときは、<a href="https://github.com/darakuneko/kb_bridge">GitHub のリポジトリ</a>を clone して、手元で書き込んでください（README の「Local testing」に手順があります）</td></tr>
-      <tr><td>書き込みページで KB Bridge Update が出ない</td><td>CH559 が書き込まれていない可能性があります。<a href="#ch559">2. CH559 の書き込み</a>をやり直してください（HY0020 を付けたあとでもできます）。それでも出なければ、PAIR を押したままつないでいるか、ケーブルがデータ通信に対応しているかを確かめる</td></tr>
+      <tr><td>ファームウェア書き込みページで KB Bridge Update が出ない</td><td>CH559 が書き込まれていない可能性があります。<a href="#ch559">2. CH559 の書き込み</a>をやり直してください（HY0020 を付けたあとでもできます）。それでも出なければ、PAIR を押したままつないでいるか、ケーブルがデータ通信に対応しているかを確かめる</td></tr>
     </table>
   </section>
 
@@ -186,11 +186,15 @@
 
   <section id="source">
     <h2>10. ソースコード</h2>
-    <p>ファームウェアと書き込みページのソースコードは <a href="https://github.com/darakuneko/kb_bridge">GitHub（darakuneko/kb_bridge）</a>で公開しています（MIT ライセンス）。困ったことや、やりたいことがあれば、自由に変更して使ってください。いい機能ができたら、ぜひプルリクエストをください。</p>
+    <p>ファームウェアと、2 つの書き込みページのソースコードは <a href="https://github.com/darakuneko/kb_bridge">GitHub（darakuneko/kb_bridge）</a>で公開しています（MIT ライセンス）。困ったことや、やりたいことがあれば、自由に変更して使ってください。いい機能ができたら、ぜひプルリクエストをください。</p>
   </section>
 
   <footer class="muted">
-    <p><a href="./?lang=ja">ファームウェア書き込みページ</a> ・ <a href="ch559.html?lang=ja">CH559 の書き込みページ（最初の 1 回）</a></p>
+    <ul class="links">
+      <li><a href="./?lang=ja">Firmware updater</a></li>
+      <li><a href="ch559.html?lang=ja">CH559 first flash</a></li>
+      <li><a href="guide_en.html">Build Guide(EN)</a></li>
+    </ul>
   </footer>
 </main>
 </body>

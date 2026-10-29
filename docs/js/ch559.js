@@ -2,7 +2,7 @@ import { USB_FILTER, flashCh559 } from './wchisp.js';
 
 const TEXT = {
   ja: {
-    lead: '組み立ての最初に 1 回だけ、USB チップ（CH559）にファームウェアを書き込むページです。HY0020 をはんだ付けする前に行ってください。以後の更新は通常の更新ページで CH559 も自動で書き換わるので、ここは使いません。',
+    lead: '組み立ての最初に 1 回だけ、USB チップ（CH559）にファームウェアを書き込むページです。HY0020 をはんだ付けする前に行ってください。以後の更新はファームウェア書き込みページで CH559 も自動で書き換わるので、ここは使いません。',
     unsupported: 'このブラウザは WebUSB に対応していません。パソコンの Chrome か Edge で開いてください。',
     s1: '1. ファームウェアを選ぶ',
     board: '基板',
@@ -32,7 +32,7 @@ const TEXT = {
     latest: '（最新）',
   },
   en: {
-    lead: 'Write the USB chip (CH559) firmware once, at the start of the build, before the HY0020 is soldered on. Later updates go through the normal update page, which updates the CH559 as well.',
+    lead: 'Write the USB chip (CH559) firmware once, at the start of the build, before the HY0020 is soldered on. Later updates go through the firmware updater, which updates the CH559 as well.',
     unsupported: 'This browser does not support WebUSB. Open this page in Chrome or Edge on a computer.',
     s1: '1. Choose the firmware',
     board: 'Board',

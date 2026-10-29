@@ -41,14 +41,14 @@
 
   <section id="ch559">
     <h2>2. Write the CH559</h2>
-    <p><strong>Before soldering the HY0020</strong>, write the firmware into the USB chip (CH559) with the <a href="ch559.html?lang=en">CH559 flashing page</a>, in Chrome or Edge on a computer.</p>
+    <p><strong>Before soldering the HY0020</strong>, write the firmware into the USB chip (CH559) with the <a href="ch559.html?lang=en">CH559 first flash page</a>, in Chrome or Edge on a computer.</p>
     <ol class="steps">
       <li>Keep the two JP1 holes (silkscreen "BOOT") shorted, for example with the end of a jumper wire, while you plug J1 (the USB-C receptacle) into the computer.
         <figure class="diagram"><img src="img/buttons.svg" style="max-width:100%;height:auto" alt="Component side: position of JP1 (BOOT)"></figure></li>
       <li>Press "Write" on the page, choose the WCH device (4348:55E0) in the list and press "Connect".</li>
       <li>When it says "Done", unplug the USB cable and remove the JP1 short.</li>
     </ol>
-    <p class="muted">On Windows, install the WinUSB driver with Zadig once first (the flashing page explains how). Without the HY0020 the LED stays dark after writing. To check it, plug it in while holding PAIR: a "KB Bridge Update" serial port should appear on the computer.</p>
+    <p class="muted">On Windows, install the WinUSB driver with Zadig once first (the CH559 first flash page explains how). Without the HY0020 the LED stays dark after writing. To check it, plug it in while holding PAIR: a "KB Bridge Update" serial port should appear on the computer.</p>
   </section>
 
   <section id="solder">
@@ -190,7 +190,11 @@
   </section>
 
   <footer class="muted">
-    <p><a href="./?lang=en">Firmware updater</a> · <a href="ch559.html?lang=en">CH559 flashing page (once, at the start)</a></p>
+    <ul class="links">
+      <li><a href="./?lang=en">Firmware updater</a></li>
+      <li><a href="ch559.html?lang=en">CH559 first flash</a></li>
+      <li><a href="guide_ja.html">Build Guide(JA)</a></li>
+    </ul>
   </footer>
 </main>
 </body>
