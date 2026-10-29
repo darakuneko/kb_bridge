@@ -70,7 +70,8 @@ const $ = (id) => document.getElementById(id);
 function savedLang() {
   try { return localStorage.getItem('lang'); } catch (e) { return null; }
 }
-let lang = (savedLang() || navigator.language || 'ja').startsWith('ja') ? 'ja' : 'en';
+const urlLang = new URLSearchParams(location.search).get('lang');   // set by the build guide's links
+let lang = (urlLang || savedLang() || navigator.language || 'ja').startsWith('ja') ? 'ja' : 'en';
 let index = { boards: [] };
 let localFile = null;
 let busy = false;
@@ -82,6 +83,7 @@ function applyText() {
   for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
   $('lang').textContent = lang === 'ja' ? 'English' : '日本語';
   $('guide').href = lang === 'ja' ? 'guide_ja.html' : 'guide_en.html';
+  $('ch559').href = `ch559.html?lang=${lang}`;
   fillBoards();
 }
 
@@ -189,6 +191,7 @@ async function init() {
   $('lang').addEventListener('click', () => {
     lang = lang === 'ja' ? 'en' : 'ja';
     try { localStorage.setItem('lang', lang); } catch (e) { /* private mode */ }
+    if (urlLang) history.replaceState(null, '', `?lang=${lang}${location.hash}`);   // a reload keeps the choice
     applyText();
   });
   $('board').addEventListener('change', fillVersions);
