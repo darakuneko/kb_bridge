@@ -20,7 +20,4 @@ Ch559IspResult ch559_isp_flash(const uint8_t *image, uint32_t len, bool app_runn
 
 void ch559_reset();                          // RST pulse, application starts (XI released)
 
-// Set before an update and cleared after a good one: a CH559 that does not answer is reflashed
-// only when an update of ours was cut short (never while it is being written over USB with JP1).
-bool ch559_isp_pending();
-void ch559_isp_set_pending(bool pending);
+

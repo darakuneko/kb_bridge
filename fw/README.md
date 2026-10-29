@@ -12,9 +12,8 @@ The CH559 firmware is embedded in the nRF firmware. **Updating the nRF once also
 ## Build
 
 ```
-fw/build.sh                 # v0.6 board
-BOARD_REV=7 fw/build.sh     # v0.7 board (CH559 power switch, RESET through a FET, CC Rp from P0.28)
-BOARD_REV=7 EXTRA_FLAGS=-DSYSTEM_OFF_IDLE_MS=30000 fw/build.sh   # extra defines, e.g. a 30 s System OFF for testing
+fw/build.sh                 # KB Bridge v0.7
+EXTRA_FLAGS=-DSYSTEM_OFF_IDLE_MS=30000 fw/build.sh   # extra defines, e.g. a 30 s System OFF for testing
 ```
 
 - Output: `fw/build/kb_bridge_dfu.zip` (nRF DFU package), `fw/build/kb_bridge_ch559.{bin,hex}`
@@ -62,12 +61,12 @@ The CH559 only relays. When a device attaches it sends the HID interfaces and re
 | USB recovery | Re-enumerate after 200 consecutive IN errors (20 right after a resume). Enumeration failing for 2 s: VBUS_KB off for 0.5 s and back on (like a re-plug, up to 3 times per plug-in) |
 | USB suspend | After 2 minutes without input the keyboard is suspended. Remote wakeup is enabled; a key (bus K state) or host output (LEDs, Vial) resumes it, and it is re-enumerated if it does not answer. Without `rgb_matrix.sleep` a QMK keyboard keeps its RGB on in suspend |
 | CH559 sleep | With no keyboard or the keyboard in USB suspend, the nRF's `MSG_SLEEP` powers the CH559 down. A USB event (remote wakeup) or RXD going low (the nRF sends one 0x00 byte and waits `LINK_WAKE_MS`) wakes it. Woken for no reason, it watches for 10 ms and sleeps again. While the bus is suspended it resumes only when it sees K within 40 ms (QMK repeats K about every 17 ms while a key is held) |
-| CH559 power switch (v0.7) | With no keyboard the CH559 is switched off altogether (P0.02). It comes back with the keyboard's VBUS (CC detect) |
-| CH559 auto-update | The running CH559 application is sent `MSG_ENTER_BOOTLOADER` (XI low + an RST pulse does not enter the bootloader; P4.6 is read only at power-on), then the nRF writes it over the serial bootloader (V2.40, P0.2/P0.3), ending with an empty chunk that commits the write. It rewrites only when the CH559 answers with another build, or when the previous update was cut short (a flag in flash), and not when the supply is below 4.4 V. On failure the green blink count gives the reason, then fast red: 1 no answer, 2 wrong chip, 3 config read, 4 key, 5 erase, 6 write, 7 verify, 9 written but does not start |
+| CH559 power switch | With no keyboard the CH559 is switched off altogether (P0.02). It comes back with the keyboard's VBUS (CC detect) |
+| CH559 auto-update | The running CH559 application is sent `MSG_ENTER_BOOTLOADER` (XI low + an RST pulse does not enter the bootloader; P4.6 is read only at power-on), then the nRF writes it over the serial bootloader (V2.40, P0.2/P0.3), ending with an empty chunk that commits the write. It rewrites only when the CH559 answers with another build, or when it does not answer (no application yet, or an update cut short: it is then power-cycled with XI low), and not when the supply is below 4.4 V. On failure the green blink count gives the reason, then fast red: 1 no answer, 2 wrong chip, 3 config read, 4 key, 5 erase, 6 write, 7 verify, 9 written but does not start |
 | nRF idle | After 1 s with nothing to do, loop() runs every 10 ms instead of 1 ms (the first key after that waits up to 10 ms more). While the CH559 sleeps the UART is stopped too and loop() waits 100 ms. loop() waits on a task notification instead of delay(), so BLE writes and an RX falling edge wake it at once |
-| System OFF (v0.7) | After 10 minutes without a BLE connection (`SYSTEM_OFF_IDLE_MS`) the CH559, keyboard power, keep-alive and LED are switched off and the nRF enters System OFF. LOW-I or plugging / unplugging the keyboard (CC) wakes it as a reset. Not PAIR: P0.20 low at reset keeps the bootloader in DFU mode |
+| System OFF | After 10 minutes without a BLE connection (`SYSTEM_OFF_IDLE_MS`) the CH559, keyboard power, keep-alive and LED are switched off and the nRF enters System OFF. LOW-I or plugging / unplugging the keyboard (CC) wakes it as a reset. Not PAIR: P0.20 low at reset keeps the bootloader in DFU mode |
 | nRF power | Internal DC/DC enabled (`NRF_DCDC_ENABLE`). The HY0020 has the inductor inside; DCC tied to DEC4 selects DC/DC mode, which R1 (0 Ω) on the AE-HY0020-DIP already does |
-| CH559 start-up (v0.7) | `main()` clears the P3.2 latch before making the pin push-pull: the latch resets to 1, and a short high pulse would reset the nRF through Q4 |
+| CH559 start-up | `main()` clears the P3.2 latch before making the pin push-pull: the latch resets to 1, and a short high pulse would reset the nRF through Q4 |
 
 ## Behaviour
 

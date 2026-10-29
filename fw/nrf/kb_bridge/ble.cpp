@@ -46,7 +46,6 @@ static BLEDis dis;
 static BLECharacteristic pnp_chr(UUID16_CHR_PNP_ID);
 static const uint8_t pnp[7] = {2, (uint8_t)USB_VID, (uint8_t)(USB_VID >> 8), (uint8_t)USB_PID,
                                (uint8_t)(USB_PID >> 8), 0, 0};
-static const char *OLD_PNP_FILE = "/kbb_pnp";   // fw 0.2.0 kept the keyboard's id here
 
 // ATT MTU: the Vial report is 32 bytes. With the default 23 (20-byte payload) Bluefruit splits a
 // notification into 20 + 12 bytes, which the host drops as malformed, and the host's 32-byte
@@ -189,7 +188,6 @@ void ble_begin() {
   dis.setFirmwareRev(FW_VERSION_STR);
   dis.begin();
   InternalFS.begin();
-  if (InternalFS.exists(OLD_PNP_FILE)) InternalFS.remove(OLD_PNP_FILE);
   pnp_chr.setProperties(CHR_PROPS_READ);                  // added to the DIS (the last service begun)
   pnp_chr.setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);
   pnp_chr.setFixedLen(7);

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KB Bridge Build Guide</title>
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 <main class="doc">
@@ -148,6 +148,7 @@
       <tr><td>つながらない、すぐ切れる</td><td>PAIR を 3 秒押してペアリング情報を消し、接続先の機器からも KB Bridge を削除して、ペアリングし直す</td></tr>
       <tr><td>モバイルバッテリーの電源が切れる</td><td>LOW-I を押して「強」（緑 3 回）にする</td></tr>
       <tr><td>Linux（Ubuntu など）で、しばらく放置すると打てなくなる。Bluetooth を切ってつなぎ直すと直る</td><td>パソコン側の Bluetooth アダプターの省電力（USB autosuspend）が原因です。<code>cat /sys/module/btusb/parameters/enable_autosuspend</code> が <code>Y</code> なら、<code>echo 'options btusb enable_autosuspend=0' | sudo tee /etc/modprobe.d/btusb.conf</code> を実行してパソコンを再起動します（<code>N</code> になれば完了）</td></tr>
+      <tr><td>書き込みが途中で止まる、エラーになる</td><td>抜いて、PAIR を押したままつなぎ直し、もう一度書き込みます。途中で止まっても、書き直せば元に戻ります。何回か試してもうまくいかないときは、<a href="https://github.com/darakuneko/kb_bridge">GitHub のリポジトリ</a>を clone して、手元で書き込んでください（README の「Local testing」に手順があります）</td></tr>
       <tr><td>書き込みページで KB Bridge Update が出ない</td><td>CH559 が書き込まれていない可能性があります。<a href="#ch559">2. CH559 の書き込み</a>をやり直してください（HY0020 を付けたあとでもできます）。それでも出なければ、PAIR を押したままつないでいるか、ケーブルがデータ通信に対応しているかを確かめる</td></tr>
     </table>
   </section>

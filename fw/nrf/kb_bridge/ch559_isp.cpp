@@ -9,8 +9,6 @@
 #include "ch559_isp.h"
 #include "config.h"
 #include "link_proto.h"
-#include <InternalFileSystem.h>
-using namespace Adafruit_LittleFS_Namespace;
 
 namespace {
 
@@ -84,8 +82,8 @@ void serial_end() {
 }
 
 // A running CH559 application jumps to the bootloader on ENTER_BOOTLOADER.
-// Holding XI low through a RST pulse does NOT enter it on this board (the pin seems
-// to be sampled at power-on only); it stays as the try for a CH559 without a working application.
+// Holding XI low through a RST pulse does NOT enter it (P4.6 is sampled at power-on only), so a
+// CH559 without a working application is power-cycled with XI low instead.
 void enter_bootloader(bool app_running) {
   if (app_running) {
     serial_end();
@@ -98,18 +96,13 @@ void enter_bootloader(bool app_running) {
     Serial.write(f, 4);
     Serial.flush();
     delay(50);
-  } else if (BOARD_REV >= 7) {
-    // v0.7: power it up with XI held low: the bootloader samples P4.6 at power-on
+  } else {
+    // power it up with XI held low: the bootloader samples P4.6 at power-on
     pinMode(PIN_CH559_BOOT, OUTPUT);
     digitalWrite(PIN_CH559_BOOT, LOW);
     digitalWrite(PIN_CH559_PWR_OFF, HIGH);
     delay(200);                                                // let VDD fall (C8 / C9)
     digitalWrite(PIN_CH559_PWR_OFF, LOW);
-    delay(100);
-  } else {
-    pinMode(PIN_CH559_BOOT, OUTPUT);
-    digitalWrite(PIN_CH559_BOOT, LOW);                         // XI low during the reset
-    ch559_reset();
     delay(100);
   }
   serial_end();
@@ -146,19 +139,6 @@ void ch559_reset() {
   digitalWrite(PIN_CH559_RST, HIGH);
   delay(10);
   digitalWrite(PIN_CH559_RST, LOW);
-}
-
-static const char *PENDING_FILE = "/kbb_isp";
-
-bool ch559_isp_pending() { return InternalFS.exists(PENDING_FILE); }
-
-void ch559_isp_set_pending(bool pending) {
-  if (!pending) {
-    InternalFS.remove(PENDING_FILE);
-    return;
-  }
-  File f(InternalFS);
-  if (f.open(PENDING_FILE, FILE_O_WRITE)) f.close();
 }
 
 

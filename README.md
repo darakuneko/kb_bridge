@@ -24,11 +24,14 @@ Firmware, browser-based flashing pages and the build guide for KB Bridge, an ada
 
 ## Local testing
 
-Web Serial / WebUSB only work over https or on localhost.
+If writing from GitHub Pages keeps failing, clone this repository and serve the pages from your own computer. Web Serial / WebUSB only work over https or on localhost.
 
 ```sh
-cd docs && python3 -m http.server 8000     # open http://localhost:8000 in Chrome
+git clone https://github.com/darakuneko/kb_bridge.git
+cd kb_bridge/docs && python3 -m http.server 8000     # open http://localhost:8000 in Chrome
 ```
+
+Or write the nRF without a browser: `adafruit-nrfutil --verbose dfu serial -pkg <firmware zip> -p <port> -b 115200 --singlebank` (see [fw/README.md](fw/README.md)).
 
 ## Tests
 

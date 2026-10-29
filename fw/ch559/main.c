@@ -67,7 +67,6 @@ static void send_status(void)
 
 void main(void)
 {
-#if BOARD_REV >= 7
     /* P3.2 -> N-FET gate (nRF RESET): push-pull, idle low; P3.3 (PAIR, through a diode): input with
      * pull-up. The latch comes out of reset at 1: clear it before the pin turns push-pull, or it
      * drives high for a few cycles, which is enough to reset the nRF through the FET. First thing
@@ -77,18 +76,8 @@ void main(void)
     PORT_CFG &= (uint8_t)~bP3_OC;
     P3_DIR = (P3_DIR & (uint8_t)~0x08) | 0x04;
     P3_PU |= 0x08;
-#endif
     clock_init(FSYS_12MHZ);
     tick_init();
-
-#if BOARD_REV < 7
-    /* P3.2 (nRF RESET): quasi-bidirectional, idle high; P3.3 (PAIR): input with pull-up */
-    PORT_CFG |= bP3_OC;
-    P3_DIR &= (uint8_t)~0x0C;
-    P3_PU |= 0x0C;
-    P3_2 = 1;
-    P3_3 = 1;
-#endif
     EA = 1;
 
     if (pair_held()) {
@@ -98,13 +87,7 @@ void main(void)
         cdc_bridge_run();
     }
 
-    /* Host mode never drives the nRF's RESET: P3.2 open-drain released and without pull-up
-     * (the nRF has its own). Only the update mode pulses it. */
-#if BOARD_REV < 7
-    P3_PU &= (uint8_t)~0x04;
-    P3_2 = 1;
-#endif
-
+    /* Host mode never pulses the nRF's RESET (P3.2 stays low); only the update mode does. */
     wdog_enable();
     safe_mode_open();                    /* clocks off for the peripherals host mode does not use */
     SLEEP_CTRL = bSLP_OFF_ADC | bSLP_OFF_UART1 | bSLP_OFF_P1S1 | bSLP_OFF_SPI0 | bSLP_OFF_TMR3 | bSLP_OFF_LED;

@@ -21,16 +21,8 @@ void delay_us(uint16_t us);        /* approximate, for short USB timings */
 void wdog_enable(void);
 #define wdog_feed() (WDOG_COUNT = 0)
 
-/* Board revision (Makefile: BOARD_REV=6|7). v0.7: P3.2 drives an N-FET that pulls the nRF RESET
- * low (push-pull, HIGH = reset); v0.6: P3.2 is wired to RESET (quasi-bidirectional, LOW = reset). */
-#ifndef BOARD_REV
-#define BOARD_REV 6
-#endif
-#if BOARD_REV >= 7
+/* P3.2 drives an N-FET that pulls the nRF RESET low (push-pull, HIGH = reset) */
 #define NRF_RESET_IDLE 0
-#else
-#define NRF_RESET_IDLE 1
-#endif
 
 void timer0_isr(void) __interrupt(INT_NO_TMR0);
 

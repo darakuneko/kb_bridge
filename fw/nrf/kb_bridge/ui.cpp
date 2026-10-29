@@ -72,11 +72,11 @@ void save_settings() {
 
 uint16_t read_mv(uint8_t pin);
 
-// v0.7 with CC_RP_PULSED: Rp (33k) is powered from a pin only while sampling (it draws ~90uA
+// With CC_RP_PULSED: Rp (33k) is powered from a pin only while sampling (it draws ~90uA
 // through the keyboard's Rd otherwise). A floating CC would read low = "Rd present", so it is
 // always driven here.
 uint16_t read_cc_mv() {
-  if (BOARD_REV < 7 || !CC_RP_PULSED) return read_mv(PIN_KB_CC_SENSE);
+  if (!CC_RP_PULSED) return read_mv(PIN_KB_CC_SENSE);
   digitalWrite(PIN_KB_CC_PU, HIGH);
   delayMicroseconds(200);
   uint16_t mv = read_mv(PIN_KB_CC_SENSE);
@@ -225,10 +225,8 @@ void ui_begin() {
   digitalWrite(PIN_KEEPALIVE, LOW);
   pinMode(PIN_KB_VBUS_EN, OUTPUT);
   digitalWrite(PIN_KB_VBUS_EN, LOW);
-  if (BOARD_REV >= 7) {
-    pinMode(PIN_KB_CC_PU, OUTPUT);
-    digitalWrite(PIN_KB_CC_PU, CC_RP_PULSED ? LOW : HIGH);
-  }
+  pinMode(PIN_KB_CC_PU, OUTPUT);
+  digitalWrite(PIN_KB_CC_PU, CC_RP_PULSED ? LOW : HIGH);
   // A button already down at power-on (LOW-I that woke us from System OFF, PAIR in update mode)
   // counts only once it is released and pressed again.
   pair_btn.down = pair_btn.long_sent = digitalRead(PIN_BTN_PAIR) == LOW;
@@ -300,7 +298,7 @@ void ui_system_off_prepare() {
   digitalWrite(PIN_KEEPALIVE, LOW);
   kb_power = false;
   digitalWrite(PIN_KB_VBUS_EN, LOW);
-  if (BOARD_REV >= 7) digitalWrite(PIN_KB_CC_PU, HIGH);   // Rp stays on in System OFF (pins keep their state)
+  digitalWrite(PIN_KB_CC_PU, HIGH);   // Rp stays on in System OFF (pins keep their state)
   uint32_t cc = g_ADigitalPinMap[PIN_KB_CC_SENSE];
   nrf_gpio_cfg_input(cc, NRF_GPIO_PIN_NOPULL);
   delayMicroseconds(200);

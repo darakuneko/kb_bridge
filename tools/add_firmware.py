@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Add a KB Bridge DFU package to the site (firmware/<board>/ + firmware/index.json, newest first).
 
-  tools/add_firmware.py <kb_bridge_dfu.zip> --board v0.7 [--ch559 <kb_bridge_ch559.bin>] [--version 0.2.0]
+  tools/add_firmware.py <kb_bridge_dfu.zip> --board v0.7 [--ch559 <kb_bridge_ch559.bin>] [--version 0.3.1]
                         [--notes "..."] [--notes-en "..."]
 
 --ch559 defaults to kb_bridge_ch559.bin next to the zip (fw/build.sh writes both): the image for the CH559's
 first flash before the HY0020 is fitted (ch559.html). Its build id comes from fw/ch559/build/build_id.txt.
 
 --version defaults to FW_VERSION_STR in fw/nrf/kb_bridge/config.h. Files go to docs/firmware/.
-Build the package first with BOARD_REV=7 fw/build.sh (the board must match: v0.6 and v0.7 builds differ).
+Build the package first with fw/build.sh.
 """
 import argparse
 import datetime
@@ -24,7 +24,7 @@ INDEX = os.path.join(HERE, "firmware", "index.json")
 FW = os.path.join(ROOT, "fw")
 CONFIG = os.path.join(FW, "nrf", "kb_bridge", "config.h")
 BUILD_ID = os.path.join(FW, "ch559", "build", "build_id.txt")
-BOARD_NAMES = {"v0.6": "KB Bridge v0.6", "v0.7": "KB Bridge v0.7"}
+BOARD_NAMES = {"v0.7": "KB Bridge v0.7"}
 
 
 def fw_version():

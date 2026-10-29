@@ -1,26 +1,21 @@
 // KB Bridge nRF52832 (AE-HY0020-DIP) firmware: pins and tuning.
-// Boards v0.6 / v0.7 (BOARD_REV). Arduino pin numbers = P0.xx on the Feather nRF52832 core.
+// Board v0.7. Arduino pin numbers = P0.xx on the Feather nRF52832 core.
 #pragma once
 
-#define FW_VERSION_STR      "0.3.0"
+#define FW_VERSION_STR      "0.3.1"
 #define DEVICE_NAME         "KB Bridge"
 #define MANUFACTURER_NAME   "KB Bridge"
-#define MODEL_NAME          "KB Bridge v0.6"
+#define MODEL_NAME          "KB Bridge v0.7"
 // USB VID / PID of KB Bridge: the BLE PnP ID (what Vial shows) and the update-mode USB serial
 // (ch559/cdc.c). Not the attached keyboard's.
 #define USB_VID             0x7A79
 #define USB_PID             0x1576
 
-// Board revision: build.sh passes -DBOARD_REV (6 = v0.6, 7 = v0.7).
-#ifndef BOARD_REV
-#define BOARD_REV 6
-#endif
-
 // ---- pins ----------------------------------------------------------------------------------
 #define PIN_LINK_TX         6     // -> CH559 P0.2 RXD_   (Serial default TX)
 #define PIN_LINK_RX         8     // <- CH559 P0.3 TXD_   (Serial default RX)
 #define PIN_CH559_RST       18    // -> CH559 RST (active high, CH559 has a pull-down)
-#define PIN_CH559_BOOT      16    // -> CH559 P4.6/XI: drive low + RST pulse = CH559 bootloader
+#define PIN_CH559_BOOT      16    // -> CH559 P4.6/XI: low at power-up = CH559 bootloader
 #define PIN_VIN_SENSE       5     // AIN3: VBUS_IN / 2 (100k/100k)
 #define PIN_KB_CC_SENSE     4     // AIN2: keyboard CC, 33k to 3V3 + 10k series; ~0.44 V with the keyboard's Rd
 #define PIN_KB_VBUS_EN      7     // SY6280 EN (high = keyboard powered)
@@ -29,10 +24,9 @@
 #define PIN_KEEPALIVE       12    // AO3400A gate: 3 x 100R load on VBUS_IN
 #define PIN_LED_A           9     // bi-colour LED between LED_A and LED_B (NFC pins as GPIO)
 #define PIN_LED_B           10
-// v0.7 only
 #define PIN_CH559_PWR_OFF   2     // high = CH559 unpowered (gate of its P-FET, 1M pull-down = on)
-#define PIN_KB_CC_PU        28    // Rp 33k source (v0.7)
-// v0.7: Rp powered only while CC is sampled (saves ~90uA with a keyboard attached). Off by default:
+#define PIN_KB_CC_PU        28    // Rp 33k source
+// Rp powered only while CC is sampled (saves ~90uA with a keyboard attached). Off by default:
 // a keyboard whose USB-C controller watches CC could take a missing Rp for a detach.
 #define CC_RP_PULSED        false
 
@@ -93,9 +87,9 @@
 // mode, so the firmware switches it (the datasheet: register setting needed either way).
 #define NRF_DCDC_ENABLE          true
 // System OFF (nRF ~0.5 uA, CH559 / keyboard / keep-alive off) after this long without a BLE
-// connection. v0.7 only (v0.6 cannot switch the CH559 off). Wakes as a reset on LOW-I or on a
+// connection. Wakes as a reset on LOW-I or on a
 // keyboard plugged in / pulled out (CC). Not PAIR: P0.20 low at reset keeps the bootloader in DFU.
-#define SYSTEM_OFF_ENABLE        (BOARD_REV >= 7)
+#define SYSTEM_OFF_ENABLE        true
 #ifndef SYSTEM_OFF_IDLE_MS
 #define SYSTEM_OFF_IDLE_MS       600000   // build.sh: EXTRA_FLAGS=-DSYSTEM_OFF_IDLE_MS=30000 to test
 #endif

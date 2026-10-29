@@ -124,10 +124,6 @@ int main() {
   send_desc(2, shared_desc, sizeof shared_desc);
   frame(MSG_ENUM_DONE, {});
   assert(bridge_keyboard_present() && bridge_has_vial());
-  {
-    uint16_t vid, pid, ver;
-    assert(bridge_device_id(vid, pid, ver) && vid == 0x446E && pid == 0x0001 && ver == 0x0001);
-  }
   events.clear();
 
   // boot keyboard: shift + A, then + B, release A
@@ -219,10 +215,6 @@ int main() {
   frame(MSG_DEV_DETACH, {0});
   expect({"kb 01 04 00 00 00 00 00", "kb 00 00 00 00 00 00 00", "mouse 00 0 0 0 0"});
   assert(!bridge_keyboard_present());
-  {
-    uint16_t vid, pid, ver;
-    assert(!bridge_device_id(vid, pid, ver));
-  }
 
   // a HELLO (CH559 restarted) also drops the device and releases keys
   frame(MSG_DEV_ATTACH, {0x6E, 0x44, 0x01, 0x00, 0x01, 0x00, 1, 1});

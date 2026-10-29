@@ -70,10 +70,8 @@ static bool ch559_up_to_date() {
 }
 
 static void ch559_start() {
-  if (BOARD_REV >= 7) {
-    pinMode(PIN_CH559_PWR_OFF, OUTPUT);
-    digitalWrite(PIN_CH559_PWR_OFF, LOW);          // on
-  }
+  pinMode(PIN_CH559_PWR_OFF, OUTPUT);
+  digitalWrite(PIN_CH559_PWR_OFF, LOW);            // on
   pinMode(PIN_CH559_BOOT, INPUT);                  // never hold XI in normal operation
   pinMode(PIN_CH559_RST, OUTPUT);
   digitalWrite(PIN_CH559_RST, LOW);
@@ -87,19 +85,16 @@ static void ch559_start() {
     delay(10);
   }
 
-  // Update only a CH559 that answers with another build, or one whose update of ours was cut
-  // short. A silent CH559 is otherwise left alone on v0.6: it may be in its USB bootloader (JP1)
-  // being written by wchisp. v0.7 can power it up with XI low, so a silent one is reflashed too.
+  // Update a CH559 that answers with another build, or a silent one (no application yet, or an
+  // update of ours cut short): it is powered up with XI low to enter its bootloader.
   bool answered = ch559_restart();
   ch559_ok = answered && ch559_up_to_date();
-  if (ch559_ok && ch559_isp_pending()) ch559_isp_set_pending(false);   // written with JP1 meanwhile
-  bool update = !ch559_ok && (answered || ch559_isp_pending() || BOARD_REV >= 7);
+  bool update = !ch559_ok;
   if (update && ui_vin_mv() < ISP_MIN_VIN_MV) {
     // reflashing on a sagging supply could leave the CH559 without firmware: try next boot
     ui_set_mode(LED_ERROR);
   } else if (update) {
     ui_set_mode(LED_UPDATING);
-    ch559_isp_set_pending(true);
     Ch559IspResult r = ISP_OK;
     for (int attempt = 0; attempt < 2 && !ch559_ok; attempt++) {
       uint32_t until = millis() + 50;
@@ -108,7 +103,6 @@ static void ch559_start() {
       answered = false;                            // a second try finds the bootloader or a fresh chip
       ch559_ok = (r == ISP_OK) && ch559_restart() && ch559_up_to_date();
     }
-    if (ch559_ok) ch559_isp_set_pending(false);
     ui_set_mode(ch559_ok ? LED_OFF : LED_ERROR);
     if (!ch559_ok) ui_flash(true, r ? r : 9);      // green x result (ch559_isp.h), x9: wrote but no HELLO; then fast red
   } else if (!ch559_ok) {
@@ -194,7 +188,7 @@ static void usb_power() {
 // CH559 power-down while it has nothing to do: no keyboard (VBUS_KB off, so nothing can attach),
 // or the keyboard's bus suspended. It wakes itself on a USB event (remote wakeup); we wake it
 // before any frame (link.cpp) and when a keyboard is plugged in.
-// v0.7: no keyboard -> the CH559 is switched off altogether (MSG_SLEEP still covers the suspended
+// No keyboard -> the CH559 is switched off altogether (MSG_SLEEP still covers the suspended
 // keyboard, whose USB state must survive). It comes back with the keyboard's VBUS (CC detect).
 static void ch559_power(bool on) {
   if (on == ch559_powered) return;
@@ -214,7 +208,7 @@ static void ch559_power(bool on) {
 
 static void ch559_sleep() {
   if (!CH559_SLEEP_ENABLE) return;
-  if (BOARD_REV >= 7 && ch559_ok) {
+  if (ch559_ok) {
     if (!ch559_powered) {
       if (ui_keyboard_powered()) ch559_power(true);
       return;
