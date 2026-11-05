@@ -5,6 +5,19 @@
       "name": "KB Bridge v0.7",
       "firmware": [
         {
+          "version": "0.3.2",
+          "date": "2026-11-05",
+          "file": "firmware/v0.7/kb_bridge_v0.7_0.3.2_20261105.zip",
+          "ch559": {
+            "file": "firmware/v0.7/kb_bridge_ch559_v0.7_0.3.2_20261105.bin",
+            "build_id": "0xFF329865"
+          },
+          "notes": {
+            "ja": "トラックパッド付きキーボードのカクつきと、使用中の再起動を修正。Linux の BLE で Vial につながるように。",
+            "en": "Fixes choppy trackpads and restarts during use. Vial now works over BLE on Linux."
+          }
+        },
+        {
           "version": "0.3.1",
           "date": "2026-10-29",
           "file": "firmware/v0.7/kb_bridge_v0.7_0.3.1_20261029.zip",
