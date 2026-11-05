@@ -13,8 +13,8 @@
             "build_id": "0xFF329865"
           },
           "notes": {
-            "ja": "トラックパッド付きキーボードのカクつきと、使用中の再起動を修正。Linux の BLE で Vial につながるように。",
-            "en": "Fixes choppy trackpads and restarts during use. Vial now works over BLE on Linux."
+            "ja": "マウス操作（トラックパッドなど）のカクつきを改善。Linux の BLE で Vial につながるように。",
+            "en": "Smoother mouse movement (trackpads etc.). Vial now works over BLE on Linux."
           }
         },
         {
