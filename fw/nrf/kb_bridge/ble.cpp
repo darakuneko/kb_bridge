@@ -168,8 +168,8 @@ void ble_begin() {
   VialHidService::queue = xQueueCreate(8, 32);
   led_queue = xQueueCreate(4, 1);
 
-  Bluefruit.configPrphConn(ATT_MTU, BLE_GAP_EVENT_LENGTH_DEFAULT, BLE_GATTS_HVN_TX_QUEUE_SIZE_DEFAULT,
-                           BLE_GATTC_WRITE_CMD_TX_QUEUE_SIZE_DEFAULT);
+  // 7.5 ms event, 4 queued notifications: the defaults (3.75 ms, 1) carry ~35 reports/s, too few for a trackpad
+  Bluefruit.configPrphConn(ATT_MTU, 6, 4, BLE_GATTC_WRITE_CMD_TX_QUEUE_SIZE_DEFAULT);
   Bluefruit.begin(1, 0);
   if (NRF_DCDC_ENABLE) sd_power_dcdc_mode_set(NRF_POWER_DCDC_ENABLE);   // see config.h
   Bluefruit.setTxPower(4);

@@ -76,12 +76,20 @@ static const uint8_t shared_desc[] = {
   0x95, 0x01, 0x75, 0x03, 0x91, 0x01, 0xC0,
 };
 
-static void frame(uint8_t type, std::vector<uint8_t> payload) {
+static uint32_t conn_count = 0;
+
+static void handle(uint8_t type, const std::vector<uint8_t> &payload) {
   LinkFrame f{};
   f.type = type;
   f.len = (uint8_t)payload.size();
   memcpy(f.data, payload.data(), payload.size());
   bridge_handle(f);
+}
+
+// one frame per loop(): reports go out in bridge_task()
+static void frame(uint8_t type, std::vector<uint8_t> payload) {
+  handle(type, payload);
+  bridge_task(true, conn_count);
 }
 
 static void send_desc(uint8_t iface, const uint8_t *d, size_t n) {
@@ -183,7 +191,8 @@ int main() {
   // new connection: the current state is sent once (here: shift held)
   frame(MSG_REPORT, {0, 0x02, 0, 0, 0, 0, 0, 0, 0});
   expect({"kb 02 00 00 00 00 00 00"});
-  bridge_task(true, 1);
+  conn_count = 1;
+  bridge_task(true, conn_count);
   expect({"kb 02 00 00 00 00 00 00", "cc 0000", "sys 00", "mouse 01 0 0 0 0"});
   // disconnected: nothing queued now is replayed later
   fail_next = 100;
@@ -205,6 +214,31 @@ int main() {
   bridge_task(true, 1);
   assert(events.size() == 32 && events.back() == "kb 00 00 00 00 00 00 00");
   events.clear();
+
+  // mouse frames that arrive within one loop() go out as one report
+  handle(MSG_REPORT, {2, 2, 0x01, 0x05, 0x01, 0, 0});
+  handle(MSG_REPORT, {2, 2, 0x01, 0x03, 0xFF, 0, 0});
+  assert(bridge_pending_reports() == 1);
+  bridge_task(true, conn_count);
+  expect({"mouse 01 8 0 0 0"});
+  // not merged: another button state, or a sum that does not fit the report
+  handle(MSG_REPORT, {2, 2, 0x01, 0x05, 0, 0, 0});
+  handle(MSG_REPORT, {2, 2, 0x00, 0x05, 0, 0, 0});
+  bridge_task(true, conn_count);
+  expect({"mouse 01 5 0 0 0", "mouse 00 5 0 0 0"});
+  handle(MSG_REPORT, {2, 2, 0x00, 0x7F, 0, 0, 0});
+  handle(MSG_REPORT, {2, 2, 0x00, 0x01, 0, 0, 0});
+  bridge_task(true, conn_count);
+  expect({"mouse 00 127 0 0 0", "mouse 00 1 0 0 0"});
+  // not merged into a report of another kind
+  handle(MSG_REPORT, {2, 4, 0xE9, 0x00});
+  handle(MSG_REPORT, {2, 2, 0x00, 0x01, 0, 0, 0});
+  bridge_task(true, conn_count);
+  expect({"cc 00e9", "mouse 00 1 0 0 0"});
+  frame(MSG_REPORT, {2, 4, 0x00, 0x00});
+  expect({"cc 0000"});
+  frame(MSG_REPORT, {2, 2, 0x01, 0, 0, 0, 0});                   // button held again for the tests below
+  expect({"mouse 01 0 0 0 0"});
 
   // STATUS (heartbeat answer)
   frame(MSG_STATUS, {STATE_RUNNING, 1, 0x34, 0x12, 2});

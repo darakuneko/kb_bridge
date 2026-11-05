@@ -93,6 +93,15 @@ void queue_consumer() {
 }
 void queue_system() { enqueue(OUT_SYSTEM, &cur_system, 1); }
 void queue_mouse(uint8_t buttons, int8_t x, int8_t y, int8_t w, int8_t p) {
+  // BLE slower than the trackpad: add to the report still waiting instead of queueing another
+  if (out_count) {
+    OutReport &r = out_queue[(out_head + out_count - 1) % OUT_QUEUE];
+    int sx = (int8_t)r.data[1] + x, sy = (int8_t)r.data[2] + y, sw = (int8_t)r.data[3] + w, sp = (int8_t)r.data[4] + p;
+    if (r.kind == OUT_MOUSE && r.data[0] == buttons && abs(sx) <= 127 && abs(sy) <= 127 && abs(sw) <= 127 && abs(sp) <= 127) {
+      r.data[1] = (uint8_t)sx; r.data[2] = (uint8_t)sy; r.data[3] = (uint8_t)sw; r.data[4] = (uint8_t)sp;
+      return;
+    }
+  }
   uint8_t d[5] = {buttons, (uint8_t)x, (uint8_t)y, (uint8_t)w, (uint8_t)p};
   enqueue(OUT_MOUSE, d, 5);
 }
@@ -273,8 +282,9 @@ void process_report(Iface &it, const uint8_t *data, uint8_t len) {
     cur_buttons = buttons;
     active = true;
   }
+  // sent from bridge_task(), once per loop(): a blocking send here would keep the frames of a
+  // fast trackpad coming and loop() from ever feeding the watchdog
   if (active) last_activity_ms = millis();
-  flush();
 }
 
 void enum_done() {

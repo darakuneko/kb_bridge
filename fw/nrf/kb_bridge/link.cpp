@@ -115,7 +115,8 @@ bool link_poll(LinkFrame &f) {
     peer_asleep = false;           // it woke by itself; else link_idle_task() would stop the UART again
     uart_start();
   }
-  if (rx_state != RX_SOF && millis() - rx_last_ms > LINK_BYTE_TIMEOUT_MS) rx_state = RX_SOF;
+  // only with nothing waiting: while loop() was blocked in a BLE send, the rest of the frame came in
+  if (rx_state != RX_SOF && !Serial.available() && millis() - rx_last_ms > LINK_BYTE_TIMEOUT_MS) rx_state = RX_SOF;
   while (Serial.available()) {
     uint8_t c = Serial.read();
     rx_last_ms = millis();

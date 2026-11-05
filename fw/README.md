@@ -53,8 +53,8 @@ The CH559 only relays. When a device attaches it sends the HID interfaces and re
 | | |
 |---|---|
 | CH559 clock | 12 MHz normally (USB has its own 48 MHz), 48 MHz only in update mode |
-| BLE connection parameters | 11.25–15 ms interval, slave latency 30, 4 s supervision timeout (within Apple's HID rules). Same input latency, lower idle current |
-| No lost reports | BLE reports go through an ordered queue (32 entries) and are resent on the next loop if sending fails. On overflow the oldest are dropped (the latest state always stays). Input while disconnected is not replayed after reconnecting; the current state is sent once on connect |
+| BLE connection parameters | 11.25–15 ms interval, slave latency 30, 4 s supervision timeout (within Apple's HID rules). Same input latency, lower idle current. Event length 7.5 ms and 4 queued notifications, for trackpads |
+| No lost reports | BLE reports go through an ordered queue (32 entries), sent once per loop and resent on the next loop if sending fails. Mouse motion is added to a mouse report still waiting at the tail (same buttons, sum fits). On overflow the oldest are dropped (the latest state always stays). Input while disconnected is not replayed after reconnecting; the current state is sent once on connect |
 | No stuck keys | All keys are released when the keyboard is unplugged, the CH559 restarts (HELLO) or the device re-enumerates |
 | Watchdogs | nRF 4 s (from the end of setup), CH559 5.6 s at 12 MHz (stopped while powered down) |
 | Heartbeat | The nRF sends PING every second → the CH559 answers with STATUS (state, suspended, consecutive errors, enumeration failures). No answer for 3.5 s: the CH559 is reset |
