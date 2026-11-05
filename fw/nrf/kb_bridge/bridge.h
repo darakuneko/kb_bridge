@@ -21,6 +21,8 @@ void bridge_handle(const LinkFrame &f);
 void bridge_task(bool connected, uint32_t connect_count);
 void bridge_host_leds(uint8_t leds);                  // from BLE: NumLock bit0 .. Kana bit4
 void bridge_host_vial(const uint8_t data[32]);        // from BLE: Vial output report
+// A BLE write to the Vial output report -> the 32-byte report; false to drop it.
+bool vial_output_report(const uint8_t *data, uint16_t len, uint8_t out[32]);
 bool bridge_keyboard_present();                       // enumerated and has at least one HID interface
 bool bridge_has_vial();
 // VID / PID / bcdDevice of the attached device (from DEV_ATTACH); false when none.

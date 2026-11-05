@@ -391,6 +391,21 @@ void bridge_host_leds(uint8_t leds) {
   }
 }
 
+// 33 bytes: BlueZ (Linux) writes report id 0 + the report to a report map without report ids. Hosts
+// that send 32 bytes are unaffected. BlueZ drops a 32-byte write from a hidraw client here, so
+// the 33-byte form is the only one that reaches us from Linux.
+bool vial_output_report(const uint8_t *data, uint16_t len, uint8_t out[32]) {
+  if (len == 0 || len > 33) return false;
+  if (len == 33) {
+    if (data[0] != 0) return false;
+    data++;
+    len--;
+  }
+  memset(out, 0, 32);
+  memcpy(out, data, len);
+  return true;
+}
+
 void bridge_host_vial(const uint8_t data[32]) {
   if (!enumerated) return;
   last_activity_ms = millis();

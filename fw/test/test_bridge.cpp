@@ -240,6 +240,27 @@ int main() {
   frame(MSG_REPORT, {2, 2, 0x01, 0, 0, 0, 0});                   // button held again for the tests below
   expect({"mouse 01 0 0 0 0"});
 
+  // Vial output write -> 32-byte report
+  {
+    uint8_t in[33], out[32];
+    memset(in, 0xAA, sizeof in);
+    in[0] = 0x01; in[31] = 0x7F;
+    assert(vial_output_report(in, 32, out));                     // 32 bytes: as is
+    assert(memcmp(out, in, 32) == 0);
+    in[0] = 0x00; in[1] = 0x01; in[32] = 0x7E;
+    assert(vial_output_report(in, 33, out));                     // 33 bytes, report id 0: stripped
+    assert(memcmp(out, in + 1, 32) == 0);
+    in[0] = 0x01;
+    assert(!vial_output_report(in, 33, out));                    // 33 bytes, anything else: dropped
+    memset(in, 0, sizeof in);
+    in[0] = 0xFE; in[1] = 0x01;
+    memset(out, 0xAA, sizeof out);
+    assert(vial_output_report(in, 2, out));                      // short: zero padded
+    assert(out[0] == 0xFE && out[1] == 0x01 && out[2] == 0 && out[31] == 0);
+    assert(!vial_output_report(in, 0, out));                     // empty: dropped
+    assert(!vial_output_report(in, 34, out));                    // too long: dropped
+  }
+
   // STATUS (heartbeat answer)
   frame(MSG_STATUS, {STATE_RUNNING, 1, 0x34, 0x12, 2});
   assert(bridge_status().valid && bridge_status().suspended == 1 && bridge_status().in_errors == 0x1234);

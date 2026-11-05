@@ -1,6 +1,7 @@
 // KB Bridge nRF: BLE HID (keyboard / consumer / system / mouse) + Vial raw HID service + DIS.
 #include <bluefruit.h>
 #include "ble.h"
+#include "bridge.h"
 #include "config.h"
 #include "wake.h"
 #include <InternalFileSystem.h>
@@ -79,7 +80,7 @@ class VialHidService : public BLEService {
 
     out_.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE | CHR_PROPS_WRITE_WO_RESP);
     out_.setPermission(SECMODE_ENC_NO_MITM, SECMODE_ENC_NO_MITM);
-    out_.setFixedLen(32);
+    out_.setMaxLen(33);                           // variable length, see vial_output_report()
     out_.setReportRefDescriptor(0, 2);            // no report id, output
     out_.setWriteCallback(on_write);
     VERIFY_STATUS(out_.begin());
@@ -122,9 +123,8 @@ class VialHidService : public BLEService {
  private:
   static void on_write(uint16_t conn, BLECharacteristic *, uint8_t *data, uint16_t len) {
     conn_hdl = conn;
-    uint8_t buf[32] = {0};
-    memcpy(buf, data, len > 32 ? 32 : len);
-    if (queue) xQueueSend(queue, buf, 0);
+    uint8_t buf[32];
+    if (vial_output_report(data, len, buf) && queue) xQueueSend(queue, buf, 0);
     loop_wake();
   }
 
