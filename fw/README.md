@@ -77,12 +77,14 @@ The CH559 only relays. When a device attaches it sends the HID interfaces and re
 | Keyboard LEDs | Host LED output → the keyboard's LED output reports (all of them, including ones with a report id) |
 | Keyboard power | VBUS_KB is switched on only when CC shows an Rd (0.44 V). A PC or charger plugged into J2 gets no 5 V |
 | Keep-alive | LOW-I cycles weak → strong → off (saved, default weak). Strong: 200 ms every 5 s at ~150 mA (~6 mA average). Weak: 50 ms every 10 s (~0.75 mA average, for power banks in their own low-current mode). Makers differ: tune `KEEPALIVE_WEAK_*` |
-| PAIR button | Short press: start advertising / hold 3 s: forget all bonds |
-| LED (bi-colour) | Advertising: green blink / connected: green 2 s / connected, no keyboard: slow red blink / CH559 update: red-green alternating / CH559 fault: fast red / supply below 4.5 V: one red blink every 5 s / LOW-I: green ×2 = weak, green ×3 = strong, red ×2 = off |
+| Hosts | Up to 4 (`BLE_HOST_COUNT`). PAIR + LOW-I pressed together selects the next one (1 → 2 → 3 → 4 → 1): the bridge disconnects and advertises as that host, green blinks show its number. The selection is saved and kept through power-off and System OFF. Each host has its own BLE address (the chip's own address with the host number in the low byte; host 1 keeps the address of older firmware, so its pairing stays) and name (`KB Bridge 1` to `KB Bridge 4`; older firmware: `KB Bridge`, a host shows the new name once paired again), so a host that is not selected never connects. Its bonds are kept in a folder of its own (the selected host's in Bluefruit's bond folder, the others in `/kbb_hosts/<n>`, swapped on a switch): the same computer can be paired as two hosts |
+| PAIR button | Short press: start advertising / hold 3 s: forget the selected host's bonds (red ×3) |
+| PAIR + LOW-I | Together, short: next host / held 3 s together: forget every host's bonds (red ×5). Neither button's own action happens then |
+| LED (bi-colour) | Advertising: green blink / connected: green 2 s / connected, no keyboard: slow red blink / CH559 update: red-green alternating / CH559 fault: fast red / supply below 4.5 V: one red blink every 5 s / LOW-I (on release): green ×2 = weak, green ×3 = strong, red ×2 = off / host switch: green × host number |
 
 ## Not implemented / later
 
-- Switching between several hosts, NKRO BLE reports, battery service
+- NKRO BLE reports, battery service
 
 ## About licenses
 

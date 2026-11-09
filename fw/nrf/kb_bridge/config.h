@@ -2,7 +2,7 @@
 // Board v0.7. Arduino pin numbers = P0.xx on the Feather nRF52832 core.
 #pragma once
 
-#define FW_VERSION_STR      "0.3.2"
+#define FW_VERSION_STR      "0.4.0"
 #define DEVICE_NAME         "KB Bridge"
 #define MANUFACTURER_NAME   "KB Bridge"
 #define MODEL_NAME          "KB Bridge v0.7"
@@ -49,7 +49,10 @@
 #define CC_CHECK_PERIOD_MS       100
 #define CC_ATTACH_MV             1200   // CC below this = the keyboard's Rd is there (0.44 V expected)
 #define CC_DETACH_MS             500    // CC high this long with VBUS on = keyboard unplugged
-#define BTN_LONG_MS              3000   // PAIR held this long = forget all bonds
+#define BTN_LONG_MS              3000   // PAIR held this long = forget the selected host; both buttons = all hosts
+// Hosts the bridge switches between (PAIR + LOW-I together selects the next one). Each has its own
+// BLE address and bonds, so a host that is not selected never connects.
+#define BLE_HOST_COUNT           4
 #define ADV_FAST_TIMEOUT_S       30
 
 // ---- stability -----------------------------------------------------------------------------

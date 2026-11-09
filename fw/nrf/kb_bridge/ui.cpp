@@ -12,6 +12,7 @@ const char *CFG_FILE = "/kbb_cfg";
 struct Settings {
   uint8_t magic = 0xB5;
   uint8_t keepalive = KA_WEAK;          // KeepAlive; 0 / 1 keep their old meaning (keep-alive on / off)
+  uint8_t host = 0;                     // selected BLE host (added in 0.4.0: older files end before it)
 } settings;
 
 LedMode mode = LED_OFF;
@@ -34,11 +35,15 @@ bool ka_on = false;
 struct Button {
   explicit Button(uint8_t p) : pin(p) {}
   uint8_t pin;
-  bool down = false, long_sent = false;
+  bool down = false;
   uint32_t since = 0;
   uint32_t change_ms = 0;
 };
 Button pair_btn(PIN_BTN_PAIR), lowi_btn(PIN_BTN_LOWI);
+// One press sequence lasts until both buttons are up again. Once both were down together it is
+// a two-button press, and neither button's own action happens.
+bool both_seen = false, long_sent = false, ignore_press = false;
+uint32_t both_since = 0;
 
 void led(int8_t colour) {               // -1 off, 0 red, 1 green
   if (colour < 0) {
@@ -56,7 +61,11 @@ void load_settings() {
   File f(InternalFS);
   if (f.open(CFG_FILE, FILE_O_READ)) {
     Settings s;
-    if (f.read(&s, sizeof(s)) == sizeof(s) && s.magic == 0xB5 && s.keepalive <= KA_WEAK) settings = s;
+    int n = f.read(&s, sizeof(s));
+    if (n >= 2 && s.magic == 0xB5 && s.keepalive <= KA_WEAK) {
+      if (n < (int)sizeof(s) || s.host >= BLE_HOST_COUNT) s.host = 0;
+      settings = s;
+    }
     f.close();
   }
 }
@@ -142,25 +151,44 @@ uint32_t led_ms_to_next_edge() {
   return p < LED_BLINK_MS ? LED_BLINK_MS - p : period - p;
 }
 
-UiEvent button_task(Button &b, bool is_pair) {
+// 20 ms debounce: a change counts once it has been stable that long. True when the state changed.
+bool debounce(Button &b) {
   bool pressed = digitalRead(b.pin) == LOW;
   uint32_t now = millis();
-  // 20 ms debounce: a change counts once it has been stable that long
-  if (pressed != b.down) {
-    if (!b.change_ms) b.change_ms = now ? now : 1;
-    if (now - b.change_ms < 20) return UI_NONE;
+  if (pressed == b.down) {
+    b.change_ms = 0;
+    return false;
   }
+  if (!b.change_ms) b.change_ms = now ? now : 1;
+  if (now - b.change_ms < 20) return false;
   b.change_ms = 0;
-  if (pressed && !b.down) {
-    b.down = true;
-    b.long_sent = false;
-    b.since = now;
-    if (!is_pair) return UI_LOWI_PRESS;
-  } else if (!pressed && b.down) {
-    b.down = false;
-    if (is_pair && !b.long_sent) return UI_PAIR_SHORT;
-  } else if (pressed && is_pair && !b.long_sent && now - b.since >= BTN_LONG_MS) {
-    b.long_sent = true;
+  b.down = pressed;
+  b.since = now;
+  return true;
+}
+
+UiEvent button_task() {
+  bool pair_changed = debounce(pair_btn), lowi_changed = debounce(lowi_btn);
+  uint32_t now = millis();
+  if (!pair_btn.down && !lowi_btn.down) {          // sequence over: the short actions happen on release
+    UiEvent e = UI_NONE;
+    if ((pair_changed || lowi_changed) && !long_sent && !ignore_press)
+      e = both_seen ? UI_BOTH_SHORT : pair_changed ? UI_PAIR_SHORT : UI_LOWI_PRESS;
+    both_seen = long_sent = ignore_press = false;
+    return e;
+  }
+  if (ignore_press || long_sent) return UI_NONE;
+  if (pair_btn.down && lowi_btn.down && !both_seen) {
+    both_seen = true;
+    both_since = now;
+  }
+  if (both_seen) {
+    if (pair_btn.down && lowi_btn.down && now - both_since >= BTN_LONG_MS) {
+      long_sent = true;
+      return UI_BOTH_LONG;
+    }
+  } else if (pair_btn.down && now - pair_btn.since >= BTN_LONG_MS) {
+    long_sent = true;
     return UI_PAIR_LONG;
   }
   return UI_NONE;
@@ -229,8 +257,9 @@ void ui_begin() {
   digitalWrite(PIN_KB_CC_PU, CC_RP_PULSED ? LOW : HIGH);
   // A button already down at power-on (LOW-I that woke us from System OFF, PAIR in update mode)
   // counts only once it is released and pressed again.
-  pair_btn.down = pair_btn.long_sent = digitalRead(PIN_BTN_PAIR) == LOW;
-  lowi_btn.down = lowi_btn.long_sent = digitalRead(PIN_BTN_LOWI) == LOW;
+  pair_btn.down = digitalRead(PIN_BTN_PAIR) == LOW;
+  lowi_btn.down = digitalRead(PIN_BTN_LOWI) == LOW;
+  ignore_press = pair_btn.down || lowi_btn.down;
   analogReference(AR_INTERNAL_3_0);
   analogReadResolution(12);
   load_settings();
@@ -243,9 +272,7 @@ void ui_begin() {
 UiEvent ui_task() {
   power_task();
   led_task();
-  UiEvent e = button_task(pair_btn, true);
-  if (e != UI_NONE) return e;
-  return button_task(lowi_btn, false);
+  return button_task();
 }
 
 LedMode ui_mode() { return mode; }
@@ -279,6 +306,14 @@ KeepAlive ui_next_keepalive() {
   settings.keepalive = order[(i + 1) % 3];
   save_settings();
   return (KeepAlive)settings.keepalive;
+}
+
+uint8_t ui_host() { return settings.host; }
+
+void ui_set_host(uint8_t host) {
+  if (host == settings.host) return;
+  settings.host = host;
+  save_settings();
 }
 
 bool ui_battery_low() { return vin_low; }

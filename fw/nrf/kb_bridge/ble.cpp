@@ -5,6 +5,7 @@
 #include "config.h"
 #include "wake.h"
 #include <InternalFileSystem.h>
+#include <utility/bonding.h>
 using namespace Adafruit_LittleFS_Namespace;
 
 // ---- main HID service ---------------------------------------------------------------------
@@ -163,8 +164,57 @@ static void on_connect(uint16_t conn) {
 
 static void on_disconnect(uint16_t, uint8_t) {}
 
+// ---- hosts ---------------------------------------------------------------------------------
+// Host n advertises as the chip's own address with n in the low byte (host 0 keeps it unchanged,
+// so the bonds made before there were several hosts stay valid) and is named "KB Bridge n+1"
+// (host 0 too: older firmware called it "KB Bridge").
+// Bluefruit keeps its bonds (keys and CCCDs, one file per peer) in BOND_DIR_PRPH; the bonds of the
+// other hosts wait in HOSTS_DIR/<n+1> and the two folders are swapped (renamed) on a switch. One
+// folder per host and not one shared: the same computer paired as two hosts gets two key sets,
+// while Bluefruit names a bond file after the peer, so in one folder the second would replace the first.
+#define HOSTS_DIR "/kbb_hosts"
+
+static ble_gap_addr_t chip_addr;
+static uint8_t host_sel;
+
+static void host_dir(char *buf, uint8_t host) { sprintf(buf, HOSTS_DIR "/%u", host + 1); }
+
+static void host_identity(uint8_t host) {
+  ble_gap_addr_t a = chip_addr;
+  a.addr[0] ^= host;
+  // Fails while advertising: an advertising timeout can restart it right after stop()
+  for (int i = 0; i < 5 && !Bluefruit.setAddr(&a); i++) {
+    Bluefruit.Advertising.stop();
+    delay(10);
+  }
+  static char name[16];
+  snprintf(name, sizeof(name), DEVICE_NAME " %u", host + 1);
+  Bluefruit.setName(name);
+  Bluefruit.ScanResponse.clearData();
+  Bluefruit.ScanResponse.addName();
+}
+
+// Advertising off and no connection: nothing can change the bonds or need the address meanwhile.
+static void ble_quiet() {
+  Bluefruit.Advertising.restartOnDisconnect(false);
+  Bluefruit.Advertising.stop();
+  for (uint16_t c = 0; c < BLE_MAX_CONNECTION; c++) {
+    BLEConnection *conn = Bluefruit.Connection(c);
+    if (conn && conn->connected()) conn->disconnect();
+  }
+  uint32_t t = millis();
+  while (Bluefruit.connected() && millis() - t < 1000) delay(10);
+  delay(200);   // Bluefruit saves the CCCDs of a closed connection from its callback task
+  Bluefruit.Advertising.stop();
+}
+
+static void ble_resume() {
+  Bluefruit.Advertising.restartOnDisconnect(true);
+  Bluefruit.Advertising.start(0);
+}
+
 // ---- public --------------------------------------------------------------------------------
-void ble_begin() {
+void ble_begin(uint8_t host) {
   VialHidService::queue = xQueueCreate(8, 32);
   led_queue = xQueueCreate(4, 1);
 
@@ -173,7 +223,7 @@ void ble_begin() {
   Bluefruit.begin(1, 0);
   if (NRF_DCDC_ENABLE) sd_power_dcdc_mode_set(NRF_POWER_DCDC_ENABLE);   // see config.h
   Bluefruit.setTxPower(4);
-  Bluefruit.setName(DEVICE_NAME);
+  chip_addr = Bluefruit.getAddr();
   Bluefruit.Periph.setConnectCallback(on_connect);
   Bluefruit.Periph.setDisconnectCallback(on_disconnect);
   Bluefruit.Periph.setConnInterval(CONN_INTERVAL_MIN, CONN_INTERVAL_MAX);
@@ -208,7 +258,8 @@ void ble_begin() {
   Bluefruit.Advertising.addTxPower();
   Bluefruit.Advertising.addAppearance(BLE_APPEARANCE_HID_KEYBOARD);
   Bluefruit.Advertising.addService(hid);
-  Bluefruit.ScanResponse.addName();
+  host_sel = host < BLE_HOST_COUNT ? host : 0;
+  host_identity(host_sel);                           // also the scan response (name)
   Bluefruit.Advertising.restartOnDisconnect(true);
   Bluefruit.Advertising.setInterval(32, 244);        // 20 ms fast, 152.5 ms slow
   Bluefruit.Advertising.setFastTimeout(ADV_FAST_TIMEOUT_S);
@@ -222,15 +273,34 @@ void ble_start_advertising() {
   if (!Bluefruit.Advertising.isRunning()) Bluefruit.Advertising.start(0);
 }
 
-void ble_forget_all() {
-  Bluefruit.Advertising.stop();
-  for (uint16_t c = 0; c < BLE_MAX_CONNECTION; c++) {
-    BLEConnection *conn = Bluefruit.Connection(c);
-    if (conn && conn->connected()) conn->disconnect();
+void ble_select_host(uint8_t host) {
+  if (host >= BLE_HOST_COUNT) return;
+  ble_quiet();
+  if (host != host_sel) {
+    char out[24], in[24];
+    host_dir(out, host_sel);
+    host_dir(in, host);
+    if (!InternalFS.exists(HOSTS_DIR)) InternalFS.mkdir(HOSTS_DIR);
+    if (InternalFS.exists(out)) InternalFS.rmdir_r(out);
+    InternalFS.rename(BOND_DIR_PRPH, out);
+    if (!InternalFS.exists(in) || !InternalFS.rename(in, BOND_DIR_PRPH)) InternalFS.mkdir(BOND_DIR_PRPH);
+    host_sel = host;
+    host_identity(host);
   }
-  delay(100);
+  ble_resume();
+}
+
+void ble_forget_host() {
+  ble_quiet();
   Bluefruit.Periph.clearBonds();
-  Bluefruit.Advertising.start(0);
+  ble_resume();
+}
+
+void ble_forget_all() {
+  ble_quiet();
+  Bluefruit.Periph.clearBonds();
+  InternalFS.rmdir_r(HOSTS_DIR);
+  ble_resume();
 }
 
 bool ble_keyboard(uint8_t mods, const uint8_t keys[6]) {

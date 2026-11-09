@@ -4,11 +4,15 @@
 #pragma once
 #include <Arduino.h>
 
-void ble_begin();
+void ble_begin(uint8_t host);                 // host: 0 .. BLE_HOST_COUNT - 1
 bool ble_connected();
 bool ble_advertising();
 void ble_start_advertising();
-void ble_forget_all();                        // clear bonds, disconnect, advertise
+// Several hosts: each has its own BLE address ("KB Bridge 1" ... "KB Bridge 4") and its own bonds.
+// The selected host's bonds are in Bluefruit's bond folder, the others are kept aside.
+void ble_select_host(uint8_t host);           // disconnect, take that host's address and bonds, advertise
+void ble_forget_host();                       // clear the selected host's bonds, disconnect, advertise
+void ble_forget_all();                        // the same for every host
 
 // Report senders return false when the report did not go out (not connected, notifications not
 // enabled yet, or the SoftDevice queue is full); the bridge keeps the state and sends it again.

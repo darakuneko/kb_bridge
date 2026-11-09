@@ -116,7 +116,7 @@ void setup() {
   nfc_pins_as_gpio();
   ui_begin();
   ch559_start();
-  ble_begin();
+  ble_begin(ui_host());
   last_link_rx_ms = last_ping_ms = millis();
   wdt_start();
 }
@@ -290,8 +290,19 @@ void loop() {
       ble_start_advertising();
       ui_flash(true, 1);
       break;
-    case UI_PAIR_LONG:
+    case UI_PAIR_LONG:                               // the selected host only
       ui_flash(false, 3);
+      ble_forget_host();
+      break;
+    case UI_BOTH_SHORT: {                            // next host: green x its number (1-4)
+      uint8_t host = (ui_host() + 1) % BLE_HOST_COUNT;
+      ble_select_host(host);
+      ui_set_host(host);
+      ui_flash(true, host + 1);
+      break;
+    }
+    case UI_BOTH_LONG:                               // every host
+      ui_flash(false, 5);
       ble_forget_all();
       break;
     case UI_LOWI_PRESS:

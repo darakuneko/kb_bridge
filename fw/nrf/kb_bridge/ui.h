@@ -6,7 +6,9 @@ enum UiEvent : uint8_t {
   UI_NONE,
   UI_PAIR_SHORT,       // PAIR pressed and released (< BTN_LONG_MS)
   UI_PAIR_LONG,        // PAIR held BTN_LONG_MS
-  UI_LOWI_PRESS,       // LOW-I pressed
+  UI_LOWI_PRESS,       // LOW-I pressed and released
+  UI_BOTH_SHORT,       // PAIR and LOW-I down together, then both released (< BTN_LONG_MS together)
+  UI_BOTH_LONG,        // PAIR and LOW-I held together BTN_LONG_MS
 };
 
 enum LedMode : uint8_t {
@@ -28,6 +30,8 @@ void ui_flash(bool green, uint8_t times); // short overlay: n blinks, then back 
 enum KeepAlive : uint8_t { KA_STRONG = 0, KA_OFF = 1, KA_WEAK = 2 };
 KeepAlive ui_keepalive();
 KeepAlive ui_next_keepalive();
+uint8_t ui_host();                      // selected BLE host (persisted)
+void ui_set_host(uint8_t host);
 uint32_t ui_ms_to_next_event();         // a keep-alive pulse ends then (loop() waits no longer)
 bool ui_battery_low();
 uint16_t ui_vin_mv();

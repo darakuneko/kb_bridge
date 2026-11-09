@@ -90,7 +90,7 @@
     <h2>5. Check it works</h2>
     <ol class="steps">
       <li>Plug J1 into a USB power source (a computer or a power bank) without pressing PAIR. A short green blink every second means it is waiting for a connection.</li>
-      <li>Pair with "KB Bridge" in the wireless (pairing) settings of your computer or phone. Once connected, the LED stays green for 2 seconds.</li>
+      <li>Pair with "KB Bridge 1" in the wireless (pairing) settings of your computer or phone. Once connected, the LED stays green for 2 seconds.</li>
       <li>Plug the keyboard into J2 (the USB-C plug). The keyboard works after about 2 seconds.</li>
     </ol>
   </section>
@@ -117,10 +117,15 @@
     <table>
       <tr><th>Button</th><th>Action</th><th>Result</th></tr>
       <tr><td>PAIR</td><td>Short press</td><td>Start waiting for a connection (to pair with another device)</td></tr>
-      <tr><td>PAIR</td><td>Hold 3 s</td><td>Forget all pairings (LED red ×3)</td></tr>
+      <tr><td>PAIR</td><td>Hold 3 s</td><td>Forget the pairings of the selected device slot (LED red ×3)</td></tr>
       <tr><td>PAIR</td><td>Hold while plugging in USB</td><td>Firmware update mode</td></tr>
-      <tr><td>LOW-I</td><td>Press</td><td>Cycle the power-bank keep-alive: weak → strong → off (saved; default weak)</td></tr>
+      <tr><td>LOW-I</td><td>Press and release</td><td>Cycle the power-bank keep-alive: weak → strong → off (saved; default weak)</td></tr>
+      <tr><td>PAIR and LOW-I</td><td>Press together and release</td><td>Switch to the next device slot (1 → 2 → 3 → 4 → 1; LED green as many times as its number)</td></tr>
+      <tr><td>PAIR and LOW-I</td><td>Hold together 3 s</td><td>Forget the pairings of every slot (LED red ×5)</td></tr>
     </table>
+    <h3>Switching between devices</h3>
+    <p>KB Bridge can be paired with up to 4 devices and switched between them with the buttons. Pressing PAIR and LOW-I together and releasing them selects the next slot, and the LED blinks green as many times as its number. The selection is saved and kept when the power is turned off.</p>
+    <p>Each slot looks like a separate device: they appear as "KB Bridge 1" to "KB Bridge 4". To add a device, switch to a free slot and pair with that name. A device paired with a slot that is not selected never connects.</p>
     <h3>Power-bank keep-alive (LOW-I)</h3>
     <p>KB Bridge draws so little current when idle that a power bank may decide it is not in use and switch itself off. The keep-alive draws a short burst of current now and then to prevent that.</p>
     <table>
@@ -170,8 +175,8 @@
     <table>
       <tr><th>Problem</th><th>What to do</th></tr>
       <tr><td>The LED never lights</td><td>Check the HY0020 soldering, then write the firmware again with the <a href="./?lang=en">updater</a></td></tr>
-      <tr><td>"KB Bridge" does not show up in the list of devices to connect</td><td>Short-press PAIR to start waiting for a connection. If a device you paired before still has KB Bridge registered, remove it in that device's wireless settings</td></tr>
-      <tr><td>It will not connect, or keeps disconnecting</td><td>Hold PAIR for 3 s to forget the pairings, remove KB Bridge on the other device as well, and pair again</td></tr>
+      <tr><td>"KB Bridge 1" (the name of the selected slot) does not show up in the list of devices to connect</td><td>Short-press PAIR to start waiting for a connection. If a device you paired before still has KB Bridge registered, remove it in that device's wireless settings</td></tr>
+      <tr><td>It will not connect, or keeps disconnecting</td><td>With that slot selected, hold PAIR for 3 s to forget its pairings, remove that slot's KB Bridge 1–4 on the other device as well, and pair again</td></tr>
       <tr><td>The power bank switches off</td><td>Press LOW-I to choose "strong" (green ×3)</td></tr>
       <tr><td>On Linux (Ubuntu etc.) typing stops working after a while; reconnecting fixes it</td><td>The computer's wireless adapter power saving (USB autosuspend) causes this. If <code>cat /sys/module/btusb/parameters/enable_autosuspend</code> prints <code>Y</code>, run <code>echo 'options btusb enable_autosuspend=0' | sudo tee /etc/modprobe.d/btusb.conf</code> and restart the computer (it should then print <code>N</code>)</td></tr>
       <tr><td>Writing stops part way or fails</td><td>Unplug, plug in again while holding PAIR and write again. An interrupted write is fixed by writing again. If it keeps failing, clone the <a href="https://github.com/darakuneko/kb_bridge">GitHub repository</a> and write from your own computer (see "Local testing" in the README)</td></tr>
