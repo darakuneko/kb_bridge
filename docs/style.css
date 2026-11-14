@@ -80,6 +80,9 @@ table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
 th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--line); }
 th { color: var(--muted); font-weight: 600; }
 .doc section { overflow-x: auto; }
+/* guides: wider than the updater pages, so long tables do not wrap every few characters */
+main.doc { max-width: 960px; }
+@media (min-width: 600px) { .doc td:first-child { min-width: 9em; } }
 
 figure { margin: 8px 0 16px; display: flex; flex-wrap: wrap; gap: 8px; }
 figure img { width: calc(50% - 4px); min-width: 240px; flex: 1 1 240px; height: auto; border-radius: 6px; }
