@@ -2,7 +2,7 @@
 // Board v0.7. Arduino pin numbers = P0.xx on the Feather nRF52832 core.
 #pragma once
 
-#define FW_VERSION_STR      "0.4.0"
+#define FW_VERSION_STR      "0.4.1"
 #define DEVICE_NAME         "KB Bridge"
 #define MANUFACTURER_NAME   "KB Bridge"
 #define MODEL_NAME          "KB Bridge v0.7"
