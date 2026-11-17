@@ -8,6 +8,19 @@
       },
       "firmware": [
         {
+          "version": "0.4.1",
+          "date": "2026-11-17",
+          "file": "firmware/v0.7/kb_bridge_v0.7_0.4.1_20261117.zip",
+          "ch559": {
+            "file": "firmware/v0.7/kb_bridge_ch559_v0.7_0.4.1_20261117.bin",
+            "build_id": "0xFF329865"
+          },
+          "notes": {
+            "ja": "内部の保存領域への書き込みを減らし、ペアリング情報が消える不具合を起きにくく（設定と接続先の切り替えは、ボタンを押し終えてから 1 回だけ保存）。すでに電源を入れ直すと再接続されなくなっている場合は、「ペアリング情報と設定を初期化してから書き込む」にチェックを入れて書き込み、ペアリングし直してください。",
+            "en": "Fewer writes to the internal storage, so pairings are much less likely to get lost (settings and device switches are saved once, after you stop pressing the buttons). If it already fails to reconnect after a power cycle, tick \"Initialise pairings and settings before writing\", write, and pair again."
+          }
+        },
+        {
           "version": "0.4.0",
           "date": "2026-11-09",
           "file": "firmware/v0.7/kb_bridge_v0.7_0.4.0_20261109.zip",
