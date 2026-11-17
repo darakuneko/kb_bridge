@@ -110,6 +110,7 @@ struct RemapBlob {
   uint16_t keymap[REMAP_LAYERS][REMAP_POSITIONS];
 };
 RemapBlob &remap_blob();
+bool remap_blob_valid();                      // after reading the file: this firmware's form
 
 // Macros (Vial Macro tab): M(n) = QK_MACRO + n. Vial's buffer: the macros one after another, each
 // ending in a 0; text, and 0x01 + code: 1 tap / 2 down / 3 up + 8-bit keycode, 4 delay + 2 bytes,

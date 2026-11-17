@@ -12,7 +12,7 @@ namespace {
 constexpr uint16_t VIA_PROTOCOL = 0x0009;
 constexpr uint32_t VIAL_PROTOCOL = 6;
 const uint8_t VIAL_UID[8] = {0x4B, 0x42, 0x42, 0x52, 0x7A, 0x79, 0x15, 0x76};   // "KBBR" + VID/PID
-constexpr uint32_t BLOB_MAGIC = 0x4B424B36;     // "KBK6" (+ combos, key overrides)
+constexpr uint32_t BLOB_MAGIC = 0x4B424B37;     // "KBK7" (ALL = the US layout: other matrix positions)
 constexpr uint32_t DEFAULT_LAYOUT = 0;          // ALL
 constexpr uint32_t SAVE_DELAY_MS = 3000;
 
@@ -638,6 +638,9 @@ void vial_cmd(uint8_t *msg) {
 int remap_pos(uint8_t usage) { return REMAP_POS_OF[usage] == 0xFF ? -1 : REMAP_POS_OF[usage]; }
 
 RemapBlob &remap_blob() { return blob; }
+
+// A keymap read from the file is usable only when it is this firmware's form.
+bool remap_blob_valid() { return blob.magic == BLOB_MAGIC; }
 
 void remap_defaults() {
   blob.magic = BLOB_MAGIC;

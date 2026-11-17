@@ -11,12 +11,11 @@ using namespace Adafruit_LittleFS_Namespace;
 void remap_store_load() {
   remap_defaults();
   remap_macros_clear();
-  uint32_t magic = remap_blob().magic;    // what this firmware writes
   InternalFS.begin();
   File f(InternalFS);
   if (f.open(KEYMAP_FILE, FILE_O_READ)) {
     // straight into the keymap (no 4 KB copy in RAM); anything off: back to the defaults
-    bool ok = f.read(&remap_blob(), sizeof(RemapBlob)) == (int)sizeof(RemapBlob) && remap_blob().magic == magic;
+    bool ok = f.read(&remap_blob(), sizeof(RemapBlob)) == (int)sizeof(RemapBlob) && remap_blob_valid();
     f.close();
     if (!ok) remap_defaults();
   }

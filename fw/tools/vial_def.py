@@ -28,15 +28,15 @@ def rc(usage):
 keys = []
 
 
-# Layout option (Vial "Layout"): ALL = the JIS keyboard plus every other key the matrix holds (the
-# default), JIS = a full-size JIS keyboard, US = a full-size ANSI keyboard.
+# Layout option (Vial "Layout"): ALL = the US (ANSI) keyboard plus every other key the matrix holds
+# (the default), JIS = a full-size JIS keyboard, US = a full-size ANSI keyboard.
 OPT_ALL, OPT_JIS, OPT_US = (0, 0), (0, 1), (0, 2)
 ANSI, JIS, EXTRA, EVERY = "ansi", "jis", "extra", "every"   # how k() is told where a key is drawn
 
 
 def k(usage, x, y, w=1, h=1, opt=None, extra=None):
     # one drawing per layout choice it appears in (Vial shows the keys of the chosen one)
-    choices = {None: [None], JIS: [OPT_ALL, OPT_JIS], ANSI: [OPT_US], EXTRA: [OPT_ALL],
+    choices = {None: [None], JIS: [OPT_JIS], ANSI: [OPT_ALL, OPT_US], EXTRA: [OPT_ALL],
                EVERY: [OPT_ALL, OPT_JIS, OPT_US]}[opt]
     for c in choices:
         keys.append((usage, x, y, w, h, c, extra or {}))
