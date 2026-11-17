@@ -69,7 +69,8 @@ struct RemapSettings {
   uint16_t mk_wheel_interval;                 // 15
   uint16_t mk_wheel_max_speed;                // 16
   uint16_t mk_wheel_time_to_max;              // 17
-  uint8_t reserved[36];                       // later settings without a new file format
+  uint16_t combo_term;                        // 2: combo keys pressed within this (0: 50)
+  uint8_t reserved[34];                       // later settings without a new file format
 };
 static_assert(sizeof(RemapSettings) == 64, "the settings keep their size in the file");
 enum : uint8_t { REMAP_TAP_PERMISSIVE_HOLD = 1, REMAP_TAP_HOLD_ON_OTHER_KEY = 2, REMAP_TAP_RETRO = 4 };
@@ -82,6 +83,21 @@ struct RemapTapDance {
 };
 static_assert(sizeof(RemapTapDance) == 10, "Vial's tap dance entry: 5 x u16");
 
+// Combo (Vial Combo tab): up to 4 keycodes pressed together within the combo term -> output.
+#define REMAP_COMBOS 16
+struct RemapCombo {
+  uint16_t input[4];                          // 0: unused
+  uint16_t output;
+};
+static_assert(sizeof(RemapCombo) == 10, "Vial's combo entry");
+// Key override (Vial Key Override tab), Vial's entry as is.
+#define REMAP_KEY_OVERRIDES 16
+struct RemapKeyOverride {
+  uint16_t trigger, replacement, layers;
+  uint8_t trigger_mods, negative_mod_mask, suppressed_mods, options;
+};
+static_assert(sizeof(RemapKeyOverride) == 10, "Vial's key override entry");
+
 struct RemapBlob {
   uint32_t magic;
   uint32_t layout_options;
@@ -89,6 +105,8 @@ struct RemapBlob {
   uint8_t reserved[3];
   RemapSettings settings;
   RemapTapDance tap_dance[REMAP_TAP_DANCES];
+  RemapCombo combo[REMAP_COMBOS];
+  RemapKeyOverride key_override[REMAP_KEY_OVERRIDES];
   uint16_t keymap[REMAP_LAYERS][REMAP_POSITIONS];
 };
 RemapBlob &remap_blob();

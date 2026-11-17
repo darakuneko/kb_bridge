@@ -349,10 +349,10 @@ int main() {
 
   // QMK settings: the supported qsids, get / set
   r = vial({0xFE, 0x09, 0, 0});
-  const uint16_t want_qs[] = {5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 17, 20, 22, 23, 24};
+  const uint16_t want_qs[] = {2, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 17, 20, 22, 23};
   for (int i = 0; i < 16; i++) assert((r[i * 2] | (r[i * 2 + 1] << 8)) == want_qs[i]);
-  r = vial({0xFE, 0x09, 24, 0});                 // the rest, after the last one seen
-  assert(r[0] == 25 && r[1] == 0 && r[2] == 0xFF && r[3] == 0xFF);
+  r = vial({0xFE, 0x09, 23, 0});                 // the rest, after the last one seen
+  assert(r[0] == 24 && r[2] == 25 && r[4] == 0xFF && r[5] == 0xFF);
   r = vial({0xFE, 0x0A, 7, 0});
   assert(r[0] == 0 && r[1] == 200 && r[2] == 0);
 
@@ -444,7 +444,7 @@ int main() {
 
   // tap dance: TD(0) on M; tap = h, hold = i, double tap = j, tap + hold = k
   r = vial({0xFE, 0x0D, 0x00});
-  assert(r[0] == REMAP_TAP_DANCES && r[1] == 0 && r[2] == 0);
+  assert(r[0] == REMAP_TAP_DANCES && r[2] == 0);
   vial({0xFE, 0x0D, 0x02, 0, 0x0B, 0, 0x0C, 0, 0x0D, 0, 0x0E, 0, 0, 0});
   r = vial({0xFE, 0x0D, 0x01, 0});
   assert(r[0] == 0 && r[1] == 0x0B && r[3] == 0x0C && r[5] == 0x0D && r[7] == 0x0E && r[9] == 0);
@@ -542,6 +542,33 @@ int main() {
   expect({"mouse 00 0 0 -1 0"});
   r = vial({0xFE, 0x0A, 10, 0});                 // interval setting
   assert(r[1] == 20 && r[2] == 0);
+
+  // combos: J + K -> Esc
+  r = vial({0xFE, 0x0D, 0x00});
+  assert(r[1] == REMAP_COMBOS);
+  vial({0xFE, 0x0D, 0x04, 0, 0x0D, 0, 0x0E, 0, 0, 0, 0, 0, 0x29, 0});
+  r = vial({0xFE, 0x0D, 0x03, 0});
+  assert(r[0] == 0 && r[1] == 0x0D && r[3] == 0x0E && r[9] == 0x29);
+  wait_ms(300);
+  events.clear();
+  key({0, 0, 0x0D}); key({0, 0, 0x0D, 0x0E});                     // both inside the term
+  expect({"kb 00 29 00 00 00 00 00"});
+  key({0, 0, 0x0E});                                               // the first key up ends it
+  expect({"kb 00 00 00 00 00 00 00"});
+  key({0});
+  expect({});
+  key({0, 0, 0x0D}); wait_ms(60);                                  // alone, the term over: j
+  expect({"kb 00 0d 00 00 00 00 00"});
+  key({0});
+  expect({"kb 00 00 00 00 00 00 00"});
+  key({0, 0, 0x0D}); key({0});                                     // tapped alone: j at once
+  expect({"kb 00 0d 00 00 00 00 00", "kb 00 00 00 00 00 00 00"});
+  key({0, 0, 0x0D}); key({0, 0, 0x0D, 0x0F}); key({0, 0, 0x0F}); key({0});   // J then L: j l
+  expect({"kb 00 0d 00 00 00 00 00", "kb 00 0d 0f 00 00 00 00", "kb 00 0f 00 00 00 00 00",
+          "kb 00 00 00 00 00 00 00"});
+  r = vial({0xFE, 0x0A, 2, 0});                  // combo term setting
+  assert(r[1] == 50);
+  wait_ms(300);
 
   vial({0xFE, 0x0C});                            // QMK settings reset
   r = vial({0xFE, 0x0A, 7, 0});

@@ -12,7 +12,7 @@ namespace {
 constexpr uint16_t VIA_PROTOCOL = 0x0009;
 constexpr uint32_t VIAL_PROTOCOL = 6;
 const uint8_t VIAL_UID[8] = {0x4B, 0x42, 0x42, 0x52, 0x7A, 0x79, 0x15, 0x76};   // "KBBR" + VID/PID
-constexpr uint32_t BLOB_MAGIC = 0x4B424B35;     // "KBK5" (9 x 22 matrix, conversion, settings, tap dance)
+constexpr uint32_t BLOB_MAGIC = 0x4B424B36;     // "KBK6" (+ combos, key overrides)
 constexpr uint32_t DEFAULT_LAYOUT = 0;          // ALL
 constexpr uint32_t SAVE_DELAY_MS = 3000;
 
@@ -220,6 +220,20 @@ struct Player {
   uint8_t queued[4];                          // macros pressed while one plays
   uint8_t nq = 0;
 } player;
+
+// Combos: presses waiting for the rest of a combo; combos that went off
+struct ComboWait {
+  uint8_t n = 0;
+  KeyEv ev[8];                                // the presses waiting (and nothing else)
+  uint16_t kc[8];                             // their keycodes when pressed
+  uint32_t ms = 0;                            // first press
+} cw;
+struct Fired {                                // a combo that went off: its output until a key of it is up
+  bool on = false;
+  uint16_t out = 0;
+  uint8_t usage[4];
+  uint8_t n = 0;
+} fired[4];
 
 // Tap dance: the one being counted, and what a finished one keeps down until its key is released
 struct Dance {
@@ -429,10 +443,12 @@ void settings_defaults() {
   c.mk_wheel_interval = 80;
   c.mk_wheel_max_speed = 8;
   c.mk_wheel_time_to_max = 40;
+  c.combo_term = 50;
 }
 
 struct Qs { uint16_t qsid; uint8_t offset, width; int8_t bit; };   // bit -1: the whole value
 const Qs QSETTINGS[] = {
+  {2, offsetof(RemapSettings, combo_term), 2, -1},
   {5, offsetof(RemapSettings, osk_tap_toggle), 1, -1},
   {6, offsetof(RemapSettings, osk_timeout), 2, -1},
   {7, offsetof(RemapSettings, tapping_term), 2, -1},
@@ -554,6 +570,7 @@ void vial_cmd(uint8_t *msg) {
         case 0x00:                                          // counts: tap dance, combo, key override, alt repeat
           memset(msg, 0, 32);
           msg[0] = REMAP_TAP_DANCES;
+          msg[1] = REMAP_COMBOS;
           break;
         case 0x01: {                                        // tap dance get: 5 x u16 LE
           uint8_t i = msg[3];
@@ -566,6 +583,21 @@ void vial_cmd(uint8_t *msg) {
           uint8_t i = msg[3];
           if (i >= REMAP_TAP_DANCES) { msg[0] = 0xFF; break; }
           memcpy(&blob.tap_dance[i], msg + 4, sizeof(RemapTapDance));
+          touch();
+          msg[0] = 0;
+          break;
+        }
+        case 0x03: {                                        // combo get: 4 inputs + output, u16 LE
+          uint8_t i = msg[3];
+          if (i >= REMAP_COMBOS) { msg[0] = 0xFF; break; }
+          memset(msg, 0, 32);
+          memcpy(msg + 1, &blob.combo[i], sizeof(RemapCombo));
+          break;
+        }
+        case 0x04: {                                        // combo set
+          uint8_t i = msg[3];
+          if (i >= REMAP_COMBOS) { msg[0] = 0xFF; break; }
+          memcpy(&blob.combo[i], msg + 4, sizeof(RemapCombo));
           touch();
           msg[0] = 0;
           break;
@@ -593,6 +625,8 @@ void remap_defaults() {
   memset(blob.reserved, 0, sizeof(blob.reserved));
   settings_defaults();
   memset(blob.tap_dance, 0, sizeof(blob.tap_dance));
+  memset(blob.combo, 0, sizeof(blob.combo));
+  memset(blob.key_override, 0, sizeof(blob.key_override));
   for (auto &td : blob.tap_dance) td.tapping_term = 200;   // as Vial: each entry has its own term
   for (int l = 0; l < REMAP_LAYERS; l++)
     for (int p = 0; p < REMAP_POSITIONS; p++)
@@ -631,6 +665,8 @@ void remap_release_all() {
   player.active = false;
   player.nq = 0;
   mk_dirs = mk_wheel_dirs = mk_accel = 0;
+  cw.n = 0;
+  for (Fired &f : fired) f.on = false;
   motion_x = motion_y = 0;
   memset(os_mods_at, 0, sizeof(os_mods_at));
 }
@@ -653,7 +689,7 @@ bool sends_key(uint16_t kc) {
   return (kc >= 0x04 && kc <= 0xFF && !(kc >= 0xE0 && kc <= 0xE7)) || (kc >= QK_MODS && kc <= QK_MODS_MAX && (kc & 0xFF));
 }
 
-void process(uint8_t usage, bool pressed);
+void process_key(uint8_t usage, bool pressed);
 
 // US layout: ASCII 0x20..0x7E -> keycode, bit 7 = with shift (what QMK's send_string types)
 uint8_t ascii_key(char c) {
@@ -942,7 +978,7 @@ void press(int p, uint32_t now) {
 void replay(const Pending &pd) {
   for (uint8_t i = 0; i < pd.n; i++) {
     if (i) report();
-    process(pd.buf[i].usage, pd.buf[i].pressed);
+    process_key(pd.buf[i].usage, pd.buf[i].pressed);
   }
 }
 
@@ -959,7 +995,7 @@ void decide_hold() {
   replay(pd);
 }
 
-void process(uint8_t usage, bool pressed) {
+void process_key(uint8_t usage, bool pressed) {
   uint32_t now = millis();
   int p = remap_pos(usage);
   if (pend.active) {
@@ -982,7 +1018,7 @@ void process(uint8_t usage, bool pressed) {
     }
     if (pend.n == sizeof(pend.buf) / sizeof(pend.buf[0])) {
       decide_hold();
-      process(usage, pressed);
+      process_key(usage, pressed);
       return;
     }
     pend.buf[pend.n++] = {usage, pressed};
@@ -1003,7 +1039,104 @@ void process(uint8_t usage, bool pressed) {
 
 }  // namespace
 
-void remap_key(uint8_t usage, bool pressed) { process(usage, pressed); }
+// ---- combos: before everything else (a key that belongs to a combo waits for the others) ----
+namespace {
+
+
+uint32_t combo_term() { return blob.settings.combo_term ? blob.settings.combo_term : 50; }
+
+bool combo_used(const RemapCombo &c) { return c.output && c.input[0] && c.input[1]; }
+
+bool in_any_combo(uint16_t kc) {
+  if (!kc) return false;
+  for (const RemapCombo &c : blob.combo)
+    if (combo_used(c))
+      for (uint16_t i : c.input)
+        if (i == kc) return true;
+  return false;
+}
+
+// how the waiting keys stand to combo c: 2 = exactly its keys, 1 = some of them, 0 = no
+int combo_match(const RemapCombo &c) {
+  if (!combo_used(c)) return 0;
+  int need = 0;
+  for (uint16_t i : c.input) if (i) need++;
+  for (uint8_t k = 0; k < cw.n; k++) {
+    bool found = false;
+    for (uint16_t i : c.input) if (i && i == cw.kc[k]) found = true;
+    if (!found) return 0;
+  }
+  return cw.n == need ? 2 : 1;
+}
+
+void combo_flush() {                          // no combo: the waiting keys as they came
+  uint8_t n = cw.n;
+  KeyEv ev[8];
+  memcpy(ev, cw.ev, sizeof(ev));
+  cw.n = 0;
+  for (uint8_t i = 0; i < n; i++) {
+    if (i) report();
+    process_key(ev[i].usage, true);
+  }
+}
+
+void combo_fire(const RemapCombo &c) {
+  Fired *f = nullptr;
+  for (Fired &x : fired) if (!x.on) { f = &x; break; }
+  if (!f) { combo_flush(); return; }
+  f->on = true;
+  f->out = c.output;
+  f->n = cw.n > 4 ? 4 : cw.n;
+  for (uint8_t i = 0; i < f->n; i++) f->usage[i] = cw.ev[i].usage;
+  cw.n = 0;
+  action(c.output, true);
+}
+
+// the waiting keys after a new press or the term: a combo, more waiting, or none
+void combo_check(bool term_over) {
+  const RemapCombo *exact = nullptr;
+  bool more = false;
+  for (const RemapCombo &c : blob.combo) {
+    int m = combo_match(c);
+    if (m == 2 && !exact) exact = &c;
+    if (m == 1) more = true;                  // a longer combo could still come
+  }
+  if (exact && (!more || term_over)) combo_fire(*exact);
+  else if (!more || term_over) combo_flush();
+}
+
+}  // namespace
+
+void remap_key(uint8_t usage, bool pressed) {
+  int p = remap_pos(usage);
+  if (pressed) {
+    uint16_t kc = p >= 0 ? resolve(p) : 0;
+    if (p < 0 || !in_any_combo(kc)) {
+      if (cw.n) { combo_flush(); report(); }
+      process_key(usage, true);
+      return;
+    }
+    if (cw.n == sizeof(cw.ev) / sizeof(cw.ev[0])) combo_flush();
+    if (!cw.n) cw.ms = millis();
+    cw.ev[cw.n] = {usage, true};
+    cw.kc[cw.n++] = kc;
+    combo_check(false);
+    return;
+  }
+  for (Fired &f : fired) {                    // a key of a combo that went off
+    if (!f.on) continue;
+    for (uint8_t i = 0; i < f.n; i++) {
+      if (f.usage[i] != usage) continue;
+      f.usage[i] = f.usage[--f.n];
+      if (f.out) { action(f.out, false); f.out = 0; }   // the first key up ends the output
+      if (!f.n) f.on = false;
+      return;
+    }
+  }
+  for (uint8_t i = 0; i < cw.n; i++)          // released before the combo was complete
+    if (cw.ev[i].usage == usage) { combo_flush(); report(); break; }
+  process_key(usage, false);
+}
 
 void remap_set_report_hook(void (*hook)()) { report_hook = hook; }
 void remap_set_ready_hook(bool (*ready)()) { ready_hook = ready; }
@@ -1013,6 +1146,10 @@ void remap_macros_clear() { memset(macro_buf, 0, sizeof(macro_buf)); }
 bool remap_task() {
   uint32_t now = millis();
   bool changed = false;
+  if (cw.n && now - cw.ms >= combo_term()) {
+    combo_check(true);
+    changed = true;
+  }
   if (pend.active && now - pend.ms >= cfg().tapping_term) {
     decide_hold();
     changed = true;
@@ -1035,6 +1172,10 @@ bool remap_task() {
 
 uint32_t remap_ms_to_next_event() {
   uint32_t now = millis(), next = UINT32_MAX;
+  if (cw.n) {
+    uint32_t t = now - cw.ms;
+    next = std::min<uint32_t>(next, t >= combo_term() ? 0 : combo_term() - t);
+  }
   if (pend.active) {
     uint32_t t = now - pend.ms;
     next = t >= cfg().tapping_term ? 0 : cfg().tapping_term - t;
