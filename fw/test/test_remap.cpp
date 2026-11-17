@@ -444,7 +444,7 @@ int main() {
 
   // tap dance: TD(0) on M; tap = h, hold = i, double tap = j, tap + hold = k
   r = vial({0xFE, 0x0D, 0x00});
-  assert(r[0] == REMAP_TAP_DANCES && r[2] == 0);
+  assert(r[0] == REMAP_TAP_DANCES && r[3] == 0);
   vial({0xFE, 0x0D, 0x02, 0, 0x0B, 0, 0x0C, 0, 0x0D, 0, 0x0E, 0, 0, 0});
   r = vial({0xFE, 0x0D, 0x01, 0});
   assert(r[0] == 0 && r[1] == 0x0B && r[3] == 0x0C && r[5] == 0x0D && r[7] == 0x0E && r[9] == 0);
@@ -568,6 +568,25 @@ int main() {
           "kb 00 00 00 00 00 00 00"});
   r = vial({0xFE, 0x0A, 2, 0});                  // combo term setting
   assert(r[1] == 50);
+  wait_ms(300);
+
+  // key override: Shift + Backspace -> Delete (shift taken away)
+  r = vial({0xFE, 0x0D, 0x00});
+  assert(r[2] == REMAP_KEY_OVERRIDES);
+  vial({0xFE, 0x0D, 0x06, 0, 0x2A, 0, 0x4C, 0, 0xFF, 0xFF, 0x02, 0, 0x02, 0x81});
+  r = vial({0xFE, 0x0D, 0x05, 0});
+  assert(r[0] == 0 && r[1] == 0x2A && r[3] == 0x4C && r[7] == 0x02 && r[10] == 0x81);
+  wait_ms(300);
+  events.clear();
+  key({0x02}); key({0x02, 0, 0x2A}); key({0x02}); key({0});
+  expect({"kb 02 00 00 00 00 00 00", "kb 00 4c 00 00 00 00 00", "kb 02 00 00 00 00 00 00",
+          "kb 00 00 00 00 00 00 00"});
+  key({0, 0, 0x2A}); key({0});                                     // without shift: backspace
+  expect({"kb 00 2a 00 00 00 00 00", "kb 00 00 00 00 00 00 00"});
+  key({0x02}); key({0x02, 0, 0x2A}); key({0, 0, 0x2A}); key({0});  // shift let go first: backspace again
+  expect({"kb 02 00 00 00 00 00 00", "kb 00 4c 00 00 00 00 00", "kb 00 00 00 00 00 00 00",
+          "kb 00 2a 00 00 00 00 00", "kb 00 00 00 00 00 00 00"});
+  vial({0xFE, 0x0D, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});    // cleared
   wait_ms(300);
 
   vial({0xFE, 0x0C});                            // QMK settings reset

@@ -221,6 +221,11 @@ struct Player {
   uint8_t nq = 0;
 } player;
 
+// Key override in effect: its key position, what it sends, the mods it takes away / adds
+int ko_pos = -1;
+uint8_t ko_idx = 0;
+uint8_t ko_suppress = 0, ko_add = 0;
+
 // Combos: presses waiting for the rest of a combo; combos that went off
 struct ComboWait {
   uint8_t n = 0;
@@ -571,6 +576,7 @@ void vial_cmd(uint8_t *msg) {
           memset(msg, 0, 32);
           msg[0] = REMAP_TAP_DANCES;
           msg[1] = REMAP_COMBOS;
+          msg[2] = REMAP_KEY_OVERRIDES;
           break;
         case 0x01: {                                        // tap dance get: 5 x u16 LE
           uint8_t i = msg[3];
@@ -598,6 +604,21 @@ void vial_cmd(uint8_t *msg) {
           uint8_t i = msg[3];
           if (i >= REMAP_COMBOS) { msg[0] = 0xFF; break; }
           memcpy(&blob.combo[i], msg + 4, sizeof(RemapCombo));
+          touch();
+          msg[0] = 0;
+          break;
+        }
+        case 0x05: {                                        // key override get
+          uint8_t i = msg[3];
+          if (i >= REMAP_KEY_OVERRIDES) { msg[0] = 0xFF; break; }
+          memset(msg, 0, 32);
+          memcpy(msg + 1, &blob.key_override[i], sizeof(RemapKeyOverride));
+          break;
+        }
+        case 0x06: {                                        // key override set
+          uint8_t i = msg[3];
+          if (i >= REMAP_KEY_OVERRIDES) { msg[0] = 0xFF; break; }
+          memcpy(&blob.key_override[i], msg + 4, sizeof(RemapKeyOverride));
           touch();
           msg[0] = 0;
           break;
@@ -667,6 +688,7 @@ void remap_release_all() {
   mk_dirs = mk_wheel_dirs = mk_accel = 0;
   cw.n = 0;
   for (Fired &f : fired) f.on = false;
+  ko_pos = -1;
   motion_x = motion_y = 0;
   memset(os_mods_at, 0, sizeof(os_mods_at));
 }
@@ -789,7 +811,63 @@ bool macro_task(uint32_t now) {
   return did;
 }
 
+// ---- key overrides (Vial's entry; QMK's activation on the trigger key) ----------------------
+enum : uint8_t {
+  KO_TRIGGER_DOWN = 1, KO_REQUIRED_MOD_DOWN = 2, KO_NEGATIVE_MOD_UP = 4, KO_ONE_MOD = 8,
+  KO_NO_REREGISTER = 16, KO_NO_UNREGISTER_ON_OTHER = 32, KO_ENABLED = 128,
+};
+uint8_t fold(uint8_t m) { return (m | (m >> 4)) & 0x0F; }     // left and right alike
+uint8_t held_mods() {
+  uint8_t m = 0;
+  for (int i = 0; i < 8; i++) if (mod_count[i]) m |= 1 << i;
+  return m | osm_armed;
+}
+int top_layer() {
+  uint32_t a = layer_state | default_layer_state;
+  for (int l = REMAP_LAYERS - 1; l >= 0; l--) if (a & (1UL << l)) return l;
+  return 0;
+}
+bool ko_mods_ok(const RemapKeyOverride &k, uint8_t mods) {
+  uint8_t held = fold(mods), need = fold(k.trigger_mods);
+  if (fold(k.negative_mod_mask) & held) return false;
+  if (!need) return true;
+  return (k.options & KO_ONE_MOD) ? (held & need) != 0 : (held & need) == need;
+}
+int ko_find(uint16_t kc) {
+  uint8_t mods = held_mods();
+  int layer = top_layer();
+  for (int i = 0; i < REMAP_KEY_OVERRIDES; i++) {
+    const RemapKeyOverride &k = blob.key_override[i];
+    if (!(k.options & KO_ENABLED) || !(k.options & KO_TRIGGER_DOWN) || k.trigger != kc) continue;
+    if (!(k.layers & (1 << layer))) continue;
+    if (ko_mods_ok(k, mods)) return i;
+  }
+  return -1;
+}
+// The override ends with its key still down: the replacement up, the trigger back (unless told not to).
+void ko_end() {
+  if (ko_pos < 0) return;
+  int p = ko_pos;
+  const RemapKeyOverride &k = blob.key_override[ko_idx];
+  ko_pos = -1;
+  action(pos_kc[p], false);
+  report();
+  if (!(k.options & KO_NO_REREGISTER)) { pos_kc[p] = k.trigger; action(k.trigger, true); }
+  else pos_kc[p] = KC_NO;
+}
+
 void send_press(int p, uint16_t kc) {
+  int ko = kc ? ko_find(kc) : -1;
+  if (ko >= 0) {
+    const RemapKeyOverride &k = blob.key_override[ko];
+    ko_pos = p;
+    ko_idx = ko;
+    ko_suppress = k.suppressed_mods;
+    ko_add = (k.replacement >= QK_MODS && k.replacement <= QK_MODS_MAX) ? hid_mods((k.replacement >> 8) & 0x1F) : 0;
+    pos_kc[p] = k.replacement;
+    action(k.replacement, true);
+    return;
+  }
   if (blob.conversion && kc >= 0x04 && kc <= 0xA4) {
     uint8_t shift = (mod_count[1] || mod_count[5] || (osm_armed & 0x22)) ? 1 : 0;
     const Conv *c = blob.conversion == REMAP_CONV_JIS_TO_US ? find_conv(JIS_TO_US, kc, shift) : find_conv(US_TO_JIS, kc, shift);
@@ -856,6 +934,7 @@ void release(int p, uint32_t now) {
   pos_down[p] = false;
   uint16_t kc = pos_kc[p];
   if (p == conv_pos) conv_pos = -1;
+  if (p == ko_pos) ko_pos = -1;                             // its replacement goes up below
   if (kc >= QK_ONE_SHOT_MOD && kc < QK_ONE_SHOT_MOD + 0x20) {
     uint8_t m = hid_mods(kc & 0x1F);
     mods_up(m);
@@ -904,6 +983,7 @@ void release(int p, uint32_t now) {
     action(kc, false);
   }
   if (os_mods_at[p]) { mods_up(os_mods_at[p]); os_mods_at[p] = 0; }
+  if (ko_pos >= 0 && !ko_mods_ok(blob.key_override[ko_idx], held_mods())) ko_end();   // its mods let go
   if (p == retro_pos) {                                     // held alone past the term: still a tap
     retro_pos = -1;
     if (press_seq == retro_seq && retro_kc) {
@@ -920,6 +1000,7 @@ void press(int p, uint32_t now) {
   pos_ms[p] = now;
   press_seq++;
   conv_pos = -1;                                            // a new key ends any shift override
+  if (ko_pos >= 0 && !(blob.key_override[ko_idx].options & KO_NO_UNREGISTER_ON_OTHER)) ko_end();
   if (os_key_pos >= 0) os_key_used = true;
   uint16_t kc = resolve(p);
   bool is_dance = kc >= QK_TAP_DANCE && kc < QK_TAP_DANCE + REMAP_TAP_DANCES;
@@ -1217,6 +1298,7 @@ uint8_t remap_mods() {
   for (int i = 0; i < 8; i++)
     if (mod_count[i]) m |= 1 << i;
   if (conv_pos >= 0) m = conv_shift ? (m & ~0x20) | 0x02 : m & ~0x22;   // converted key: its shift
+  if (ko_pos >= 0) m = (m & ~ko_suppress) | ko_add;      // key override: its mods only
   return m;
 }
 const std::vector<uint8_t> &remap_keys() { return order; }

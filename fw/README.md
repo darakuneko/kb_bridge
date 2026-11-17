@@ -94,7 +94,7 @@ The CH559 only relays. When a device attaches it sends the HID interfaces and re
 ## Not implemented / later
 
 - NKRO BLE reports, battery service
-- Own keymap: macros, combos, key overrides, mouse movement keys
+- Own keymap: key override activation on a mod press / negative mod release, alt repeat key, caps word, layer lock, remapping the mouse
 
 ## About licenses
 
