@@ -215,11 +215,13 @@ bool push_outputs(bool mouse, int32_t x, int32_t y, int32_t wheel, int32_t pan) 
   uint16_t want_consumer = own && remap_consumer() ? remap_consumer() : kb_consumer;
   uint8_t want_system = own && remap_system() ? remap_system() : kb_system;
   uint8_t buttons = kb_buttons | (own ? remap_buttons() : 0);
-  int8_t kv = 0, kh = 0;
-  if (own && remap_take_wheel(kv, kh)) {
+  int16_t mx = 0, my = 0, mv = 0, mh = 0;
+  if (own && remap_take_motion(mx, my, mv, mh)) {     // mouse keys
     mouse = true;
-    wheel += kv;
-    pan += kh;
+    x += mx;
+    y += my;
+    wheel += mv;
+    pan += mh;
   }
   if (buttons != cur_buttons) mouse = true;
   if (want_consumer != cur_consumer) {

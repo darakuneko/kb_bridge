@@ -164,7 +164,14 @@ std::vector<uint8_t> order;                   // held usages, press order
 uint16_t consumer = 0;
 uint8_t system_usage = 0;
 uint8_t buttons = 0;
-int8_t wheel_v = 0, wheel_h = 0;
+int16_t wheel_v = 0, wheel_h = 0;           // pending wheel steps
+int16_t motion_x = 0, motion_y = 0;         // pending cursor motion
+// Mouse keys: directions held, accelerations held, repeats, next move
+uint8_t mk_dirs = 0;                        // bits: up, down, left, right
+uint8_t mk_wheel_dirs = 0;                  // bits: up, down, left, right
+uint8_t mk_accel = 0;                       // bits: ACL0, ACL1, ACL2
+uint8_t mk_repeat = 0, mk_wheel_repeat = 0;
+uint32_t mk_next = 0, mk_wheel_next = 0;
 
 // conversion: the converted key pressed last decides the shift state while it is held
 int conv_pos = -1;
@@ -266,6 +273,74 @@ uint16_t resolve(int p) {
   return KC_NO;
 }
 
+// ---- mouse keys (QMK's accelerated mode) --------------------------------------------------
+uint16_t mk_or(uint16_t v, uint16_t def) { return v ? v : def; }
+
+uint16_t mk_unit(bool wheel) {
+  const RemapSettings &c = blob.settings;
+  uint16_t delta = wheel ? 1 : mk_or(c.mk_move_delta, 8);
+  uint16_t max = wheel ? mk_or(c.mk_wheel_max_speed, 8) : mk_or(c.mk_max_speed, 10);
+  uint16_t ttm = wheel ? mk_or(c.mk_wheel_time_to_max, 40) : mk_or(c.mk_time_to_max, 30);
+  uint8_t rep = wheel ? mk_wheel_repeat : mk_repeat;
+  uint32_t u;
+  if (mk_accel & 1) u = delta * max / 4;
+  else if (mk_accel & 2) u = delta * max / 2;
+  else if (mk_accel & 4) u = delta * max;
+  else if (rep == 0) u = delta;
+  else if (rep >= ttm) u = delta * max;
+  else u = (uint32_t)delta * max * rep / ttm;
+  return u > 127 ? 127 : (u ? u : 1);
+}
+
+void mk_move(bool wheel) {
+  int16_t u = mk_unit(wheel);
+  uint8_t d = wheel ? mk_wheel_dirs : mk_dirs;
+  int16_t vy = ((d & 2) ? 1 : 0) - ((d & 1) ? 1 : 0);    // down - up
+  int16_t vx = ((d & 8) ? 1 : 0) - ((d & 4) ? 1 : 0);    // right - left
+  if (wheel) {
+    wheel_v -= vy * u;                                    // wheel up = positive
+    wheel_h += vx * u;
+  } else {
+    if (vx && vy) u = std::max<int16_t>(1, u * 181 / 256);  // diagonal: the same speed
+    motion_x += vx * u;
+    motion_y += vy * u;
+  }
+}
+
+// A direction key pressed / released: the first press moves at once, the next move after the delay.
+void mouse_key(uint8_t &dirs, uint8_t bit, bool down, bool wheel) {
+  bool was = dirs != 0;
+  dirs = down ? (dirs | bit) : (dirs & ~bit);
+  if (!down) {
+    if (!dirs) (wheel ? mk_wheel_repeat : mk_repeat) = 0;
+    return;
+  }
+  const RemapSettings &c = blob.settings;
+  if (!was) (wheel ? mk_wheel_repeat : mk_repeat) = 0;
+  mk_move(wheel);
+  uint32_t delay = wheel ? mk_or(c.mk_wheel_delay, 10) : mk_or(c.mk_delay, 10);
+  (wheel ? mk_wheel_next : mk_next) = millis() + delay;
+}
+
+// Held direction keys: the next moves, faster each time.
+bool mouse_task(uint32_t now) {
+  const RemapSettings &c = blob.settings;
+  bool moved = false;
+  if (mk_dirs && (int32_t)(now - mk_next) >= 0) {
+    if (mk_repeat < 255) mk_repeat++;
+    mk_move(false);
+    mk_next = now + mk_or(c.mk_interval, 20);
+    moved = true;
+  }
+  if (mk_wheel_dirs && (int32_t)(now - mk_wheel_next) >= 0) {
+    if (mk_wheel_repeat < 255) mk_wheel_repeat++;
+    mk_move(true);
+    mk_wheel_next = now + mk_or(c.mk_wheel_interval, 80);
+    moved = true;
+  }
+  return moved;
+}
+
 void basic(uint8_t kc, bool down) {
   if ((kc >= 0x04 && kc <= 0xA4) || (kc >= 0xE0 && kc <= 0xE7)) {
     down ? usage_down(kc) : usage_up(kc);
@@ -279,11 +354,13 @@ void basic(uint8_t kc, bool down) {
   } else if (kc >= 0xD1 && kc <= 0xD8) {                  // mouse buttons 1-8
     uint8_t b = 1 << (kc - 0xD1);
     buttons = down ? (buttons | b) : (buttons & ~b);
-  } else if (kc >= 0xD9 && kc <= 0xDC && down) {          // wheel up / down / left / right: one step
-    if (kc == 0xD9) wheel_v++;
-    else if (kc == 0xDA) wheel_v--;
-    else if (kc == 0xDB) wheel_h--;
-    else wheel_h++;
+  } else if (kc >= 0xCD && kc <= 0xD0) {                  // cursor up / down / left / right
+    mouse_key(mk_dirs, 1 << (kc - 0xCD), down, false);
+  } else if (kc >= 0xD9 && kc <= 0xDC) {                  // wheel up / down / left / right
+    mouse_key(mk_wheel_dirs, 1 << (kc - 0xD9), down, true);
+  } else if (kc >= 0xDD && kc <= 0xDF) {                  // ACL0-2: fixed speed while held
+    uint8_t b = 1 << (kc - 0xDD);
+    mk_accel = down ? (mk_accel | b) : (mk_accel & ~b);
   }
 }
 
@@ -343,6 +420,15 @@ void settings_defaults() {
   c.tapping_flags = 0;
   c.osk_tap_toggle = 0;
   c.tapping_toggle = 5;
+  c.mk_delay = 10;
+  c.mk_interval = 20;
+  c.mk_move_delta = 8;
+  c.mk_max_speed = 10;
+  c.mk_time_to_max = 30;
+  c.mk_wheel_delay = 10;
+  c.mk_wheel_interval = 80;
+  c.mk_wheel_max_speed = 8;
+  c.mk_wheel_time_to_max = 40;
 }
 
 struct Qs { uint16_t qsid; uint8_t offset, width; int8_t bit; };   // bit -1: the whole value
@@ -350,6 +436,15 @@ const Qs QSETTINGS[] = {
   {5, offsetof(RemapSettings, osk_tap_toggle), 1, -1},
   {6, offsetof(RemapSettings, osk_timeout), 2, -1},
   {7, offsetof(RemapSettings, tapping_term), 2, -1},
+  {9, offsetof(RemapSettings, mk_delay), 2, -1},
+  {10, offsetof(RemapSettings, mk_interval), 2, -1},
+  {11, offsetof(RemapSettings, mk_move_delta), 2, -1},
+  {12, offsetof(RemapSettings, mk_max_speed), 2, -1},
+  {13, offsetof(RemapSettings, mk_time_to_max), 2, -1},
+  {14, offsetof(RemapSettings, mk_wheel_delay), 2, -1},
+  {15, offsetof(RemapSettings, mk_wheel_interval), 2, -1},
+  {16, offsetof(RemapSettings, mk_wheel_max_speed), 2, -1},
+  {17, offsetof(RemapSettings, mk_wheel_time_to_max), 2, -1},
   {20, offsetof(RemapSettings, tapping_toggle), 1, -1},
   {22, offsetof(RemapSettings, tapping_flags), 1, 0},   // permissive hold
   {23, offsetof(RemapSettings, tapping_flags), 1, 1},   // hold on other key press
@@ -535,6 +630,8 @@ void remap_release_all() {
   dance_held_pos = -1;
   player.active = false;
   player.nq = 0;
+  mk_dirs = mk_wheel_dirs = mk_accel = 0;
+  motion_x = motion_y = 0;
   memset(os_mods_at, 0, sizeof(os_mods_at));
 }
 
@@ -925,6 +1022,7 @@ bool remap_task() {
     changed = true;
   }
   if ((player.active || player.nq) && macro_task(now)) changed = true;
+  if ((mk_dirs || mk_wheel_dirs) && mouse_task(now)) changed = true;
   if (cfg().osk_timeout && (osm_armed || (osl_armed >= 0 && osl_armed != osl_locked)) &&
       now - os_ms >= cfg().osk_timeout) {
     osm_armed = 0;
@@ -940,6 +1038,14 @@ uint32_t remap_ms_to_next_event() {
   if (pend.active) {
     uint32_t t = now - pend.ms;
     next = t >= cfg().tapping_term ? 0 : cfg().tapping_term - t;
+  }
+  if (mk_dirs) {
+    int32_t w = (int32_t)(mk_next - now);
+    next = std::min<uint32_t>(next, w > 0 ? (uint32_t)w : 0);
+  }
+  if (mk_wheel_dirs) {
+    int32_t w = (int32_t)(mk_wheel_next - now);
+    next = std::min<uint32_t>(next, w > 0 ? (uint32_t)w : 0);
   }
   if (player.active || player.nq) {
     int32_t w = (int32_t)(player.wait_until - now);
@@ -976,10 +1082,10 @@ const std::vector<uint8_t> &remap_keys() { return order; }
 uint16_t remap_consumer() { return consumer; }
 uint8_t remap_system() { return system_usage; }
 uint8_t remap_buttons() { return buttons; }
-bool remap_take_wheel(int8_t &v, int8_t &h) {
-  if (!wheel_v && !wheel_h) return false;
-  v = wheel_v; h = wheel_h;
-  wheel_v = wheel_h = 0;
+bool remap_take_motion(int16_t &x, int16_t &y, int16_t &v, int16_t &h) {
+  if (!motion_x && !motion_y && !wheel_v && !wheel_h) return false;
+  x = motion_x; y = motion_y; v = wheel_v; h = wheel_h;
+  motion_x = motion_y = wheel_v = wheel_h = 0;
   return true;
 }
 

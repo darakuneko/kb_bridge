@@ -30,7 +30,8 @@ const std::vector<uint8_t> &remap_keys();     // press order
 uint16_t remap_consumer();
 uint8_t remap_system();
 uint8_t remap_buttons();
-bool remap_take_wheel(int8_t &v, int8_t &h);  // pending wheel steps from wheel keycodes
+// Pending mouse motion and wheel steps from mouse keys (taken: cleared).
+bool remap_take_motion(int16_t &x, int16_t &y, int16_t &v, int16_t &h);
 
 // Vial custom keycodes (USER tab; QK_KB_0 + index, fw/tools/vial_def.py "customKeycodes").
 // The JIS / US conversion ones are handled here; every one is also queued for the main loop
@@ -57,8 +58,20 @@ struct RemapSettings {
   uint8_t tapping_flags;                      // qsid 22 / 23 / 24: REMAP_TAP_* bits
   uint8_t osk_tap_toggle;                     // qsid 5: one-shot tapped this often locks (0: never)
   uint8_t tapping_toggle;                     // qsid 20: TT tapped this often toggles its layer
-  uint8_t reserved[55];                       // later settings without a new file format
+  uint8_t pad;
+  // mouse keys (qsid 9-17, QMK's accelerated mode); 0 in a file from before: the default
+  uint16_t mk_delay;                          // 9: ms from the first move to the second
+  uint16_t mk_interval;                       // 10: ms between moves
+  uint16_t mk_move_delta;                     // 11: step at the start
+  uint16_t mk_max_speed;                      // 12: x the step at full speed
+  uint16_t mk_time_to_max;                    // 13: moves until full speed
+  uint16_t mk_wheel_delay;                    // 14
+  uint16_t mk_wheel_interval;                 // 15
+  uint16_t mk_wheel_max_speed;                // 16
+  uint16_t mk_wheel_time_to_max;              // 17
+  uint8_t reserved[36];                       // later settings without a new file format
 };
+static_assert(sizeof(RemapSettings) == 64, "the settings keep their size in the file");
 enum : uint8_t { REMAP_TAP_PERMISSIVE_HOLD = 1, REMAP_TAP_HOLD_ON_OTHER_KEY = 2, REMAP_TAP_RETRO = 4 };
 
 // Tap dance (Vial Tap Dance tab): TD(n) = QK_TAP_DANCE + n.

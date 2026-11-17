@@ -349,9 +349,10 @@ int main() {
 
   // QMK settings: the supported qsids, get / set
   r = vial({0xFE, 0x09, 0, 0});
-  const uint16_t want_qs[] = {5, 6, 7, 20, 22, 23, 24, 25};
-  for (int i = 0; i < 8; i++) assert((r[i * 2] | (r[i * 2 + 1] << 8)) == want_qs[i]);
-  assert(r[16] == 0xFF && r[17] == 0xFF);
+  const uint16_t want_qs[] = {5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 17, 20, 22, 23, 24};
+  for (int i = 0; i < 16; i++) assert((r[i * 2] | (r[i * 2 + 1] << 8)) == want_qs[i]);
+  r = vial({0xFE, 0x09, 24, 0});                 // the rest, after the last one seen
+  assert(r[0] == 25 && r[1] == 0 && r[2] == 0xFF && r[3] == 0xFF);
   r = vial({0xFE, 0x0A, 7, 0});
   assert(r[0] == 0 && r[1] == 200 && r[2] == 0);
 
@@ -518,6 +519,29 @@ int main() {
   vial({0x10});                                  // macro reset
   r = vial({0x0E, 0, 0, 4});
   assert(r[4] == 0 && r[5] == 0);
+
+  // mouse keys: a step at once, the next after the delay, then faster every interval
+  set_kc(0, 0x13, 0x00CD);                       // P = cursor up
+  set_kc(0, 0x15, 0x00D0);                       // R = cursor right
+  set_kc(0, 0x16, 0x00DA);                       // S = wheel down
+  wait_ms(300);
+  events.clear();
+  key({0, 0, 0x13});
+  expect({"mouse 00 0 -8 0 0"});
+  wait_ms(15);                                   // delay 10 ms: repeat 1 -> 8 * 10 * 1 / 30 = 2
+  expect({"mouse 00 0 -2 0 0"});
+  for (int i = 0; i < 40; i++) wait_ms(20);      // full speed: 80 per move
+  assert(events.back() == "mouse 00 0 -80 0 0");
+  events.clear();
+  key({0, 0, 0x13, 0x15});                       // up + right: diagonal, the same speed
+  assert(events.size() == 1);
+  events.clear();
+  key({0}); wait_ms(100);
+  expect({});
+  key({0, 0, 0x16}); key({0});                   // wheel down: one step
+  expect({"mouse 00 0 0 -1 0"});
+  r = vial({0xFE, 0x0A, 10, 0});                 // interval setting
+  assert(r[1] == 20 && r[2] == 0);
 
   vial({0xFE, 0x0C});                            // QMK settings reset
   r = vial({0xFE, 0x0A, 7, 0});
