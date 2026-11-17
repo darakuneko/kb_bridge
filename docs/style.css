@@ -46,6 +46,8 @@ section {
 select, input[type=file] { font: inherit; color: inherit; }
 select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); width: 100%; }
 details { margin-top: 12px; }
+.check { display: flex; gap: 8px; align-items: baseline; margin-top: 12px; font-weight: 600; }
+.check + .muted { margin-top: 4px; }
 summary { cursor: pointer; color: var(--muted); }
 .steps { padding-left: 1.4em; margin: 0 0 16px; }
 .steps li { margin: 6px 0; }

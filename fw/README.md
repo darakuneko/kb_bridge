@@ -16,7 +16,7 @@ fw/build.sh                 # KB Bridge v0.7
 EXTRA_FLAGS=-DSYSTEM_OFF_IDLE_MS=30000 fw/build.sh   # extra defines, e.g. a 30 s System OFF for testing
 ```
 
-- Output: `fw/build/kb_bridge_dfu.zip` (nRF DFU package), `fw/build/kb_bridge_ch559.{bin,hex}`
+- Output: `fw/build/kb_bridge_dfu.zip` (nRF DFU package), `fw/build/kb_bridge_ch559.{bin,hex}`, `fw/build/kb_bridge_fs_reset_dfu.zip` (file system reset, see below)
 - Steps: make the CH559 → `tools/bin2h.py` generates `nrf/kb_bridge/ch559_image.h` → arduino-cli → DFU zip
 - Needs: `sdcc`, `arduino-cli` + `adafruit:nrf52`, `adafruit-nrfutil` in `fw/.venv` (`python3 -m venv fw/.venv && fw/.venv/bin/pip install adafruit-nrfutil`)
 - `fw/tools/bin/wchisp` is not in the repository. Get it from https://github.com/ch32-rs/wchisp
@@ -42,6 +42,8 @@ wchisp usage: `fw/tools/bin/wchisp -u info` / `-u flash <file>` / `-u verify <fi
 - or upload the sketch from the Arduino IDE (board: Adafruit Feather nRF52832)
 
 How it works: powered up with PAIR held, the CH559 becomes a USB serial port (CDC-ACM, 7A79:1576) bridging J1 to the nRF UART. P0.20 (= PAIR) is low, so the nRF stays in the Adafruit bootloader. When DTR is asserted (not when it drops) the CH559 pulses the nRF's RESET low (like the Feather's DTR → capacitor → RESET). Once the nRF application runs, it waits for PAIR to be released and resets the CH559. If the CH559 does not answer with HELLO or its build id differs, the nRF rewrites it through the CH559's serial bootloader.
+
+**File system reset** (`nrf/kb_bridge_fs_reset`): bonds and settings live in the Adafruit InternalFS (LittleFS v1, 128 B blocks on 4 KB flash pages). Every write rewrites a whole page, so a reset or power loss in the middle can corrupt it for good: every later write fails and pairings are lost at each power cycle, whatever firmware is written. The firmware therefore writes as rarely as it can, and the updater's "initialise pairings and settings" option writes this sketch first: it formats the file system, checks a write and read, and repeats `KBB FS RESET OK` (or `KBB FS RESET FAIL <step>`) on the UART at 115200; the updater waits for it, then writes the chosen firmware. It leaves the CH559 in update mode. By hand: write `kb_bridge_fs_reset_dfu.zip`, open the port at 115200 (DTR resets the nRF) and wait for the line, then write `kb_bridge_dfu.zip`.
 
 ## nRF ↔ CH559 link
 

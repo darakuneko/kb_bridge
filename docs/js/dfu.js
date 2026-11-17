@@ -175,3 +175,35 @@ export async function flash(port, bin, dat, onProgress = () => {}) {
   }
   await sleep(ACTIVATE_WAIT_S);
 }
+
+// After the file system reset firmware (fw/nrf/kb_bridge_fs_reset) was written: reset the nRF (DTR,
+// as above) and wait for its result line. The bootloader listens for a DFU first (about a second),
+// then the reset firmware formats and repeats "KBB FS RESET OK" / "KBB FS RESET FAIL <step>".
+// Returns 'OK', 'FAIL ...' or null (nothing heard).
+export async function waitForResetResult(port, timeoutMs = 15000) {
+  await port.open({ baudRate: 115200 });
+  const reader = port.readable.getReader();
+  const decoder = new TextDecoder();
+  let text = '';
+  let result = null;
+  try {
+    await port.setSignals({ dataTerminalReady: false });
+    await sleep(0.05);
+    await port.setSignals({ dataTerminalReady: true });
+    const deadline = Date.now() + timeoutMs;
+    while (result === null) {
+      const left = deadline - Date.now();
+      if (left <= 0) break;
+      const r = await Promise.race([reader.read(), sleep(left / 1000).then(() => ({ timeout: true }))]);
+      if (r.timeout || r.done) break;
+      text = (text + decoder.decode(r.value, { stream: true })).slice(-1024);
+      const m = text.match(/KBB FS RESET (OK|FAIL[^\r\n]*)\r?\n/);
+      if (m) result = m[1];
+    }
+  } finally {
+    try { await reader.cancel(); } catch (e) { /* already gone */ }
+    reader.releaseLock();
+    await port.close();
+  }
+  return result;
+}

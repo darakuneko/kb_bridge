@@ -25,4 +25,9 @@ arduino-cli compile --fqbn "$FQBN" \
 # 3. DFU package (application only; SoftDevice S132 6.1.1 is already on the HY0020)
 "$NRFUTIL" dfu genpkg --dev-type 0x0052 --sd-req 0x00B7 \
   --application "$OUT/nrf/kb_bridge.ino.hex" "$OUT/kb_bridge_dfu.zip"
-echo "done: $OUT/kb_bridge_dfu.zip (nRF + embedded CH559 $BUILD_ID)"
+
+# 4. File system reset (written by the updater before the firmware when "initialise" is ticked)
+arduino-cli compile --fqbn "$FQBN" --output-dir "$OUT/fs_reset" nrf/kb_bridge_fs_reset
+"$NRFUTIL" dfu genpkg --dev-type 0x0052 --sd-req 0x00B7 \
+  --application "$OUT/fs_reset/kb_bridge_fs_reset.ino.hex" "$OUT/kb_bridge_fs_reset_dfu.zip"
+echo "done: $OUT/kb_bridge_dfu.zip (nRF + embedded CH559 $BUILD_ID), $OUT/kb_bridge_fs_reset_dfu.zip"

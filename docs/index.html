@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KB Bridge Firmware Updater</title>
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 <main>
@@ -25,6 +25,8 @@
       <select id="fw"></select>
     </label>
     <p id="notes" class="muted"></p>
+    <label class="check"><input id="reset" type="checkbox"> <span data-i18n="resetLabel"></span></label>
+    <p class="muted" data-i18n="resetHelp"></p>
     <details>
       <summary data-i18n="localSummary"></summary>
       <p class="muted" data-i18n="localHelp"></p>

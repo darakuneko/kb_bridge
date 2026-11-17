@@ -1,4 +1,4 @@
-import { flash } from './dfu.js';
+import { flash, waitForResetResult } from './dfu.js';
 import { readDfuPackage } from './zip.js';
 
 // KB Bridge update mode: the CH559 shows up as this CDC serial port (fw/ch559/cdc.c).
@@ -31,6 +31,12 @@ const TEXT = {
     OPEN: 'ポートを開けませんでした。ほかのアプリ（Arduino IDE、シリアルモニターなど）が使っていないか確かめてください。',
     noFirmware: '（公開中のファームウェアはありません）',
     latest: '（最新）',
+    resetLabel: 'ペアリング情報と設定を初期化してから書き込む',
+    resetHelp: '再接続できなくなったときだけ使います。例えば、ペアリングし直しても電源を入れ直すと再接続されない、接続先の番号や LOW-I の設定が電源を入れ直すと元に戻る、といったときです。書き込みや保存の途中で電源が切れると、KB Bridge の中の保存領域が壊れてこうなることがあり、ファームウェアを書き直すだけでは直りません。すべての接続先のペアリング情報と設定（接続先の番号、LOW-I）が消えます。',
+    resetWrite: '初期化用のファームウェアを書き込み中… {p}%',
+    resetWait: '初期化しています…',
+    resetDone: '\nペアリング情報は消えています。接続先の機器から KB Bridge を削除して、ペアリングし直してください。',
+    RESET_FAIL: '初期化できませんでした。いまの KB Bridge には初期化用のファームウェアしか入っていません。\n抜いて、PAIR を押したままつなぎ直し、もう一度「書き込む」を押してください。',
     footer: 'Chrome / Edge（Windows・macOS・Linux）で動きます。書き込みはすべてこのブラウザの中で行われ、ファイルや情報が外部に送られることはありません。',
   },
   en: {
@@ -58,6 +64,12 @@ const TEXT = {
     OPEN: 'Could not open the port. Make sure no other app (Arduino IDE, a serial monitor, …) is using it.',
     noFirmware: '(no firmware published)',
     latest: ' (latest)',
+    resetLabel: 'Initialise pairings and settings before writing',
+    resetHelp: 'Only for when pairings no longer stick: for example, the KB Bridge does not reconnect after a power cycle even though you paired it again, or the selected device number or the LOW-I setting goes back after a power cycle. A power loss in the middle of a write or save can corrupt the storage inside the KB Bridge this way, and writing the firmware again does not fix it. The pairings of every device and the settings (device number, LOW-I) are erased.',
+    resetWrite: 'Writing the initialisation firmware… {p}%',
+    resetWait: 'Initialising…',
+    resetDone: '\nThe pairings are erased: remove KB Bridge on your devices and pair again.',
+    RESET_FAIL: 'Initialisation failed. The KB Bridge now holds only the initialisation firmware.\nUnplug it, plug it in again while holding PAIR and press "Write" again.',
     footer: 'Works in Chrome / Edge on Windows, macOS and Linux. Everything happens inside this browser; no files or data are sent anywhere.',
   },
 };
@@ -135,6 +147,21 @@ async function loadPackage() {
   return readDfuPackage(await res.arrayBuffer());
 }
 
+// The file system reset firmware of the selected board (index.json: boards[].fs_reset.file).
+async function loadResetPackage() {
+  const b = currentBoard();
+  const file = b && b.fs_reset && b.fs_reset.file;
+  if (!file) throw new Error('FETCH');
+  let res;
+  try {
+    res = await fetch(file, { cache: 'no-cache' });
+  } catch (e) {
+    throw new Error('FETCH');
+  }
+  if (!res.ok) throw new Error('FETCH');
+  return readDfuPackage(await res.arrayBuffer());
+}
+
 async function run() {
   if (busy) return;
   let port;
@@ -155,14 +182,31 @@ async function run() {
     } catch (e) {
       throw new Error(e.message === 'FETCH' ? 'FETCH' : 'BAD_PACKAGE');
     }
+    const reset = $('reset').checked;
+    if (reset) {
+      // 1. the file system reset firmware, 2. its result, 3. the chosen firmware
+      let resetPkg;
+      try {
+        resetPkg = await loadResetPackage();
+      } catch (e) {
+        throw new Error(e.message === 'FETCH' ? 'FETCH' : 'BAD_PACKAGE');
+      }
+      await flash(port, resetPkg.bin, resetPkg.dat, (done, total, phase) => {
+        setBar(done / total / 2);
+        setStatus(t(phase === 'write' ? 'resetWrite' : phase).replace('{p}', Math.floor((100 * done) / total)));
+      });
+      setStatus(t('resetWait'));
+      const result = await waitForResetResult(port);
+      if (result !== 'OK') throw new Error('RESET_FAIL');
+    }
     await flash(port, pkg.bin, pkg.dat, (done, total, phase) => {
-      setBar(done / total);
+      setBar(reset ? 0.5 + done / total / 2 : done / total);
       setStatus(t(phase).replace('{p}', Math.floor((100 * done) / total)));
     });
     setBar(1);
-    setStatus(t('done'), 'ok');
+    setStatus(t('done') + (reset ? t('resetDone') : ''), 'ok');
   } catch (e) {
-    const known = ['NO_BOOTLOADER', 'NO_ACK', 'BAD_PACKAGE', 'FETCH'];
+    const known = ['NO_BOOTLOADER', 'NO_ACK', 'BAD_PACKAGE', 'FETCH', 'RESET_FAIL'];
     const key = known.includes(e.message) ? e.message : e.name === 'NetworkError' || e.name === 'InvalidStateError' ? 'OPEN' : null;
     setStatus(key ? t(key) : `${t('NO_ACK')}\n(${e.name}: ${e.message})`, 'error');
   } finally {
