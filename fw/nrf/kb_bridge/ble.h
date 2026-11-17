@@ -10,6 +10,7 @@ bool ble_advertising();
 void ble_start_advertising();
 // Several hosts: each has its own BLE address ("KB Bridge 1" ... "KB Bridge 4") and its own bonds.
 // The selected host's bonds are in Bluefruit's bond folder, the others are kept aside.
+void ble_pause();                       // advertising off, connections closed (until ble_select_host / a forget)
 void ble_select_host(uint8_t host);           // disconnect, take that host's address and bonds, advertise
 void ble_forget_host();                       // clear the selected host's bonds, disconnect, advertise
 void ble_forget_all();                        // the same for every host

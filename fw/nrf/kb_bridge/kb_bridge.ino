@@ -264,6 +264,19 @@ static void update_led() {
   was_connected = conn;
 }
 
+// Host switch waiting for the button presses to stop (UI_BOTH_SHORT).
+static int8_t host_pending = -1;
+static uint32_t host_pending_ms;
+
+static void host_switch_task(bool now) {
+  if (host_pending < 0 || (!now && millis() - host_pending_ms < HOST_SWITCH_DELAY_MS)) return;
+  uint8_t host = host_pending;
+  host_pending = -1;
+  ble_select_host(host);                           // moves the bonds only if it changed; advertising again
+  ui_set_host(host);
+  ui_save_now();                                   // the bonds moved: the selection must match them
+}
+
 void loop() {
   static uint32_t busy_ms;                         // last time there was something to do
   wdt_feed();
@@ -285,23 +298,29 @@ void loop() {
   if (bridge_pending_reports()) busy_ms = millis();
 
   UiEvent ev = ui_task();
+  host_switch_task(false);
   switch (ev) {
     case UI_PAIR_SHORT:
       ble_start_advertising();
       ui_flash(true, 1);
       break;
     case UI_PAIR_LONG:                               // the selected host only
+      host_switch_task(true);                        // a host just picked is the selected one
       ui_flash(false, 3);
       ble_forget_host();
       break;
     case UI_BOTH_SHORT: {                            // next host: green x its number (1-4)
-      uint8_t host = (ui_host() + 1) % BLE_HOST_COUNT;
-      ble_select_host(host);
-      ui_set_host(host);
+      // The bonds move (flash writes) only once the presses stop: going round 1 -> 2 -> 3 writes
+      // once, and back to where it started not at all.
+      if (host_pending < 0) ble_pause();
+      uint8_t host = ((host_pending < 0 ? ui_host() : host_pending) + 1) % BLE_HOST_COUNT;
+      host_pending = host;
+      host_pending_ms = millis();
       ui_flash(true, host + 1);
       break;
     }
     case UI_BOTH_LONG:                               // every host
+      host_switch_task(true);
       ui_flash(false, 5);
       ble_forget_all();
       break;

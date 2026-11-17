@@ -273,6 +273,8 @@ void ble_start_advertising() {
   if (!Bluefruit.Advertising.isRunning()) Bluefruit.Advertising.start(0);
 }
 
+void ble_pause() { ble_quiet(); }
+
 void ble_select_host(uint8_t host) {
   if (host >= BLE_HOST_COUNT) return;
   ble_quiet();

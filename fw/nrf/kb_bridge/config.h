@@ -53,6 +53,10 @@
 // Hosts the bridge switches between (PAIR + LOW-I together selects the next one). Each has its own
 // BLE address and bonds, so a host that is not selected never connects.
 #define BLE_HOST_COUNT           4
+// Flash writes are kept rare (each one rewrites a 4 KB page; a reset in the middle can corrupt the
+// file system): a setting or host change is written this long after the last button press.
+#define SETTINGS_SAVE_DELAY_MS   2000
+#define HOST_SWITCH_DELAY_MS     1500
 #define ADV_FAST_TIMEOUT_S       30
 
 // ---- stability -----------------------------------------------------------------------------

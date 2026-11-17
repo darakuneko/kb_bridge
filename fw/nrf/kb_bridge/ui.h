@@ -38,4 +38,5 @@ uint16_t ui_vin_mv();
 bool ui_pair_held();                    // raw (for boot-time checks)
 bool ui_keyboard_powered();
 void ui_kb_power_cycle(uint32_t off_ms);
+void ui_save_now();                     // pending setting changes to flash now (normally SETTINGS_SAVE_DELAY_MS later)
 void ui_system_off_prepare();            // outputs off, LOW-I and CC armed as System OFF wake-ups   // VBUS_KB off for off_ms, then back on if the keyboard's Rd is there

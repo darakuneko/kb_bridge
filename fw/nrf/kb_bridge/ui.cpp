@@ -70,10 +70,30 @@ void load_settings() {
   }
 }
 
+// Every write to the internal file system rewrites a whole 4 KB flash page, and a reset or power
+// loss in the middle can corrupt the file system for good (bonds included). So settings are
+// written as rarely as possible: SETTINGS_SAVE_DELAY_MS after the last change (pressing a button
+// a few times writes once), only when they differ from the file, in place (one commit).
+bool settings_dirty = false;
+uint32_t settings_changed_ms = 0;
+
 void save_settings() {
-  InternalFS.remove(CFG_FILE);
+  settings_dirty = true;
+  settings_changed_ms = millis();
+}
+
+void flush_settings() {
+  if (!settings_dirty) return;
+  settings_dirty = false;
   File f(InternalFS);
-  if (f.open(CFG_FILE, FILE_O_WRITE)) {
+  if (f.open(CFG_FILE, FILE_O_READ)) {
+    Settings old;
+    bool same = f.read(&old, sizeof(old)) == (int)sizeof(old) && !memcmp(&old, &settings, sizeof(old));
+    f.close();
+    if (same) return;
+  }
+  if (f.open(CFG_FILE, FILE_O_WRITE)) {      // no truncation needed: the size only ever grows
+    f.seek(0);
     f.write((const uint8_t *)&settings, sizeof(settings));
     f.close();
   }
@@ -270,6 +290,7 @@ void ui_begin() {
 }
 
 UiEvent ui_task() {
+  if (settings_dirty && millis() - settings_changed_ms >= SETTINGS_SAVE_DELAY_MS) flush_settings();
   power_task();
   led_task();
   return button_task();
@@ -328,7 +349,10 @@ void ui_kb_power_cycle(uint32_t off_ms) {
   if (!kb_off_until) kb_off_until = 1;
 }
 
+void ui_save_now() { flush_settings(); }
+
 void ui_system_off_prepare() {
+  flush_settings();
   led(-1);
   digitalWrite(PIN_KEEPALIVE, LOW);
   kb_power = false;
