@@ -8,6 +8,19 @@
       },
       "firmware": [
         {
+          "version": "0.5.4",
+          "date": "2026-11-17",
+          "file": "firmware/v0.7/kb_bridge_v0.7_0.5.4_20261117.zip",
+          "ch559": {
+            "file": "firmware/v0.7/kb_bridge_ch559_v0.7_0.5.4_20261117.bin",
+            "build_id": "0xFF329865"
+          },
+          "notes": {
+            "ja": "Vial / VIA に対応していないキーボードのキーを、KB Bridge 側で入れ替えられるように。Vial や Pipette に「KB Bridge」として見えます（8 レイヤー、Mod-Tap / Layer-Tap、タップダンス、マクロ、コンボ、キーオーバーライド、マウスキー、JIS / US 変換、接続先の切り替えキーなど）。Vial 対応のキーボードは今まで通り、キーボード側の Vial を使います。",
+            "en": "Remap keyboards without Vial / VIA in KB Bridge itself: it shows up in Vial and Pipette as \"KB Bridge\" (8 layers, Mod-Tap / Layer-Tap, tap dance, macros, combos, key overrides, mouse keys, JIS / US conversion, host switch keys and more). Vial keyboards keep using their own Vial as before."
+          }
+        },
+        {
           "version": "0.4.1",
           "date": "2026-11-17",
           "file": "firmware/v0.7/kb_bridge_v0.7_0.4.1_20261117.zip",
