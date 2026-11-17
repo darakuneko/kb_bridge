@@ -8,6 +8,19 @@
       },
       "firmware": [
         {
+          "version": "0.5.5",
+          "date": "2026-11-17",
+          "file": "firmware/v0.7/kb_bridge_v0.7_0.5.5_20261117.zip",
+          "ch559": {
+            "file": "firmware/v0.7/kb_bridge_ch559_v0.7_0.5.5_20261117.bin",
+            "build_id": "0xFF329865"
+          },
+          "notes": {
+            "ja": "KB Bridge のキーマップ（Vial にも VIA にも対応していないキーボード用）で、レイアウト ALL を US 配列ベースに（JIS 固有のキーは下の段）。Vial のロック解除を、KB Bridge の LOW-I ボタンの長押しでもできるように（Esc や Enter のないマクロパッド向け）。0.5.4 で KB Bridge のキーマップを変更していた場合は初期値に戻るので、設定し直してください。",
+            "en": "KB Bridge's keymap (for keyboards that support neither Vial nor VIA): the ALL layout is now the US layout (the JIS-only keys are in the rows below). Vial can also be unlocked by holding the LOW-I button on KB Bridge (for macropads without Esc or Enter). A keymap changed with 0.5.4 goes back to the defaults: set it again."
+          }
+        },
+        {
           "version": "0.5.4",
           "date": "2026-11-17",
           "file": "firmware/v0.7/kb_bridge_v0.7_0.5.4_20261117.zip",
