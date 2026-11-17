@@ -45,6 +45,7 @@ constexpr uint16_t QK_MOD_TAP = 0x2000, QK_MOD_TAP_MAX = 0x3FFF;       // MT(mod
 constexpr uint16_t QK_LAYER_TAP = 0x4000, QK_LAYER_TAP_MAX = 0x4FFF;   // LT(layer, kc)
 constexpr uint16_t QK_ONE_SHOT_LAYER = 0x5280, QK_ONE_SHOT_MOD = 0x52A0, QK_LAYER_TAP_TOGGLE = 0x52C0;
 constexpr uint16_t QK_TAP_DANCE = 0x5700;
+constexpr uint16_t QK_MACRO = 0x7700;
 constexpr uint16_t QK_TO = 0x5200, QK_MOMENTARY = 0x5220, QK_DEF_LAYER = 0x5240,
                    QK_TOGGLE_LAYER = 0x5260, QK_PERSISTENT_DEF_LAYER = 0x52E0;
 
@@ -149,6 +150,7 @@ const Conv *find_conv(const Conv (&t)[N], uint8_t kc, uint8_t shift) {
 }
 
 RemapBlob blob;
+uint8_t macro_buf[REMAP_MACRO_BUFFER];
 bool dirty = false;
 uint32_t changed_ms = 0;
 uint32_t last_vial_ms = 0;                    // last Vial request
@@ -201,6 +203,16 @@ int os_tap_pos = -1;                          // tap toggle: taps of the same on
 uint8_t os_taps = 0;
 uint32_t os_tap_ms = 0;
 uint8_t os_mods_at[REMAP_POSITIONS];          // one-shot mods given to a key, taken back at release
+
+// Macro player: one action at a time from remap_task(), while the report queue has room.
+bool (*ready_hook)() = nullptr;
+struct Player {
+  bool active = false;
+  uint16_t off = 0;                           // next byte in macro_buf
+  uint32_t wait_until = 0;                    // a delay
+  uint8_t queued[4];                          // macros pressed while one plays
+  uint8_t nq = 0;
+} player;
 
 // Tap dance: the one being counted, and what a finished one keeps down until its key is released
 struct Dance {
@@ -288,6 +300,10 @@ void action(uint16_t kc, bool down) {
   if (kc <= 0xFF) { basic((uint8_t)kc, down); return; }
   if (kc >= QK_KB && kc < QK_KB + KBB_CUSTOM_COUNT) {
     if (down) custom(kc - QK_KB);
+    return;
+  }
+  if (kc >= QK_MACRO && kc < QK_MACRO + REMAP_MACROS) {
+    if (down && player.nq < sizeof(player.queued)) player.queued[player.nq++] = kc - QK_MACRO;
     return;
   }
   if (kc >= QK_MODS && kc <= QK_MODS_MAX) {
@@ -517,6 +533,8 @@ void remap_release_all() {
   memset(tt_taps, 0, sizeof(tt_taps));
   dance.active = false;
   dance_held_pos = -1;
+  player.active = false;
+  player.nq = 0;
   memset(os_mods_at, 0, sizeof(os_mods_at));
 }
 
@@ -539,6 +557,104 @@ bool sends_key(uint16_t kc) {
 }
 
 void process(uint8_t usage, bool pressed);
+
+// US layout: ASCII 0x20..0x7E -> keycode, bit 7 = with shift (what QMK's send_string types)
+uint8_t ascii_key(char c) {
+  if (c >= 'a' && c <= 'z') return 0x04 + (c - 'a');
+  if (c >= 'A' && c <= 'Z') return 0x80 | (0x04 + (c - 'A'));
+  if (c >= '1' && c <= '9') return 0x1E + (c - '1');
+  switch (c) {
+    case '0': return 0x27;  case '\n': return 0x28; case '\t': return 0x2B; case ' ': return 0x2C;
+    case '!': return 0x80 | 0x1E; case '@': return 0x80 | 0x1F; case '#': return 0x80 | 0x20;
+    case '$': return 0x80 | 0x21; case '%': return 0x80 | 0x22; case '^': return 0x80 | 0x23;
+    case '&': return 0x80 | 0x24; case '*': return 0x80 | 0x25; case '(': return 0x80 | 0x26;
+    case ')': return 0x80 | 0x27; case '-': return 0x2D; case '_': return 0x80 | 0x2D;
+    case '=': return 0x2E; case '+': return 0x80 | 0x2E; case '[': return 0x2F; case '{': return 0x80 | 0x2F;
+    case ']': return 0x30; case '}': return 0x80 | 0x30; case '\\': return 0x31; case '|': return 0x80 | 0x31;
+    case ';': return 0x33; case ':': return 0x80 | 0x33; case '\'': return 0x34; case '"': return 0x80 | 0x34;
+    case '`': return 0x35; case '~': return 0x80 | 0x35; case ',': return 0x36; case '<': return 0x80 | 0x36;
+    case '.': return 0x37; case '>': return 0x80 | 0x37; case '/': return 0x38; case '?': return 0x80 | 0x38;
+    default: return 0;
+  }
+}
+
+// Start of macro n in the buffer, or -1 (no such macro, or the buffer is not 0-terminated: a
+// write still going on).
+int macro_start(uint8_t n) {
+  if (macro_buf[REMAP_MACRO_BUFFER - 1] != 0) return -1;
+  int off = 0;
+  while (n) {
+    if (off >= REMAP_MACRO_BUFFER) return -1;
+    if (macro_buf[off++] == 0) n--;
+  }
+  return off < REMAP_MACRO_BUFFER ? off : -1;
+}
+
+uint8_t mbyte() { return player.off < REMAP_MACRO_BUFFER ? macro_buf[player.off++] : 0; }
+
+// One action of the playing macro (a tap is a press and a release, each in its own report).
+// false: the macro is over.
+bool macro_step(uint32_t now) {
+  uint8_t c = mbyte();
+  if (c == 0) return false;
+  if (c != 0x01) {                                          // text, typed on the US layout
+    uint8_t k = ascii_key((char)c);
+    if (!k) return true;
+    uint16_t kc = (k & 0x80) ? (uint16_t)(0x0200 | (k & 0x7F)) : k;   // LSFT(kc)
+    if (blob.conversion == REMAP_CONV_US_TO_JIS) {          // the OS is set to JIS
+      const Conv *cv = find_conv(US_TO_JIS, k & 0x7F, (k & 0x80) ? 1 : 0);
+      if (cv) kc = cv->out_shift ? (uint16_t)(0x0200 | cv->out) : cv->out;
+    }
+    action(kc, true); report(); action(kc, false); report();
+    return true;
+  }
+  uint8_t op = mbyte();
+  if (op >= 1 && op <= 3) {
+    uint8_t kc = mbyte();
+    if (!kc) return false;
+    if (op != 3) action(kc, true);
+    if (op == 1) report();
+    if (op != 2) action(kc, false);
+    report();
+  } else if (op >= 5 && op <= 7) {
+    uint8_t lo = mbyte(), hi = mbyte();
+    if (!lo || !hi) return false;
+    uint16_t kc = lo | (hi << 8);
+    if (kc > 0xFF00) kc = (kc & 0xFF) << 8;                 // 0xFF01 = 0x0100 (no 0 bytes in the buffer)
+    if (op != 7) action(kc, true);
+    if (op == 5) report();
+    if (op != 6) action(kc, false);
+    report();
+  } else if (op == 4) {
+    uint8_t d0 = mbyte(), d1 = mbyte();
+    if (!d0 || !d1) return false;
+    player.wait_until = now + (d0 - 1) + (d1 - 1) * 255;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+// true: something was sent
+bool macro_task(uint32_t now) {
+  bool did = false;
+  for (int i = 0; i < 8; i++) {                             // a few actions per call, as the queue allows
+    if (!player.active) {
+      if (!player.nq) break;
+      int start = macro_start(player.queued[0]);
+      memmove(player.queued, player.queued + 1, --player.nq);
+      if (start < 0) continue;
+      player.active = true;
+      player.off = start;
+      player.wait_until = now;
+    }
+    if ((int32_t)(now - player.wait_until) < 0) break;
+    if (ready_hook && !ready_hook()) break;
+    if (!macro_step(now)) player.active = false;
+    did = true;
+  }
+  return did;
+}
 
 void send_press(int p, uint16_t kc) {
   if (blob.conversion && kc >= 0x04 && kc <= 0xA4) {
@@ -793,6 +909,9 @@ void process(uint8_t usage, bool pressed) {
 void remap_key(uint8_t usage, bool pressed) { process(usage, pressed); }
 
 void remap_set_report_hook(void (*hook)()) { report_hook = hook; }
+void remap_set_ready_hook(bool (*ready)()) { ready_hook = ready; }
+uint8_t *remap_macro_buffer() { return macro_buf; }
+void remap_macros_clear() { memset(macro_buf, 0, sizeof(macro_buf)); }
 
 bool remap_task() {
   uint32_t now = millis();
@@ -805,6 +924,7 @@ bool remap_task() {
     dance_finish();
     changed = true;
   }
+  if ((player.active || player.nq) && macro_task(now)) changed = true;
   if (cfg().osk_timeout && (osm_armed || (osl_armed >= 0 && osl_armed != osl_locked)) &&
       now - os_ms >= cfg().osk_timeout) {
     osm_armed = 0;
@@ -820,6 +940,10 @@ uint32_t remap_ms_to_next_event() {
   if (pend.active) {
     uint32_t t = now - pend.ms;
     next = t >= cfg().tapping_term ? 0 : cfg().tapping_term - t;
+  }
+  if (player.active || player.nq) {
+    int32_t w = (int32_t)(player.wait_until - now);
+    next = std::min<uint32_t>(next, w > 0 ? (uint32_t)w : 1);
   }
   if (dance.active) {
     uint32_t t = now - dance.ms;
@@ -905,20 +1029,37 @@ bool remap_vial(uint8_t *msg) {
         touch();
       }
       break;
-    case ID_KEYMAP_RESET:
     case ID_EEPROM_RESET:
+      memset(macro_buf, 0, sizeof(macro_buf));
+      [[fallthrough]];
+    case ID_KEYMAP_RESET:
       remap_defaults();
       touch();
       break;
     case ID_MACRO_GET_COUNT:
-      d[0] = 0;
+      d[0] = REMAP_MACROS;
       break;
     case ID_MACRO_GET_BUFFER_SIZE:
-      d[0] = d[1] = 0;
+      d[0] = REMAP_MACRO_BUFFER >> 8;
+      d[1] = REMAP_MACRO_BUFFER & 0xFF;
       break;
     case ID_MACRO_GET_BUFFER:
-    case ID_MACRO_SET_BUFFER:
+    case ID_MACRO_SET_BUFFER: {
+      uint16_t off = (d[0] << 8) | d[1];
+      uint8_t n = d[2];
+      if (n > 28) break;
+      if (msg[0] == ID_MACRO_SET_BUFFER && !unlocked) break;   // as Vial: macros only once unlocked
+      for (uint8_t i = 0; i < n && off + i < REMAP_MACRO_BUFFER; i++) {
+        if (msg[0] == ID_MACRO_GET_BUFFER) d[3 + i] = macro_buf[off + i];
+        else macro_buf[off + i] = d[3 + i];
+      }
+      if (msg[0] == ID_MACRO_SET_BUFFER) touch();
+      break;
+    }
     case ID_MACRO_RESET:
+      memset(macro_buf, 0, sizeof(macro_buf));
+      touch();
+      break;
     case ID_BOOTLOADER_JUMP:                                // never from here
       break;
     case ID_GET_LAYER_COUNT:

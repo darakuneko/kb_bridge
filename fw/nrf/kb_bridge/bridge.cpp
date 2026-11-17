@@ -247,7 +247,12 @@ bool push_outputs(bool mouse, int32_t x, int32_t y, int32_t wheel, int32_t pan) 
 
 // The keymap needs a report boundary (a tap: its press must go out before its release).
 void keymap_report() { push_outputs(false, 0, 0, 0, 0); }
-struct KeymapHook { KeymapHook() { remap_set_report_hook(keymap_report); } } keymap_hook;
+// The macro player goes on only while the BLE report queue has room (a long macro must not push
+// out reports still waiting).
+bool keymap_ready() { return out_count <= OUT_QUEUE / 4; }
+struct KeymapHook {
+  KeymapHook() { remap_set_report_hook(keymap_report); remap_set_ready_hook(keymap_ready); }
+} keymap_hook;
 
 void process_report(Iface &it, const uint8_t *data, uint8_t len) {
   if (it.vial) {

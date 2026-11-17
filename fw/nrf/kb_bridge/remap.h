@@ -79,6 +79,16 @@ struct RemapBlob {
   uint16_t keymap[REMAP_LAYERS][REMAP_POSITIONS];
 };
 RemapBlob &remap_blob();
+
+// Macros (Vial Macro tab): M(n) = QK_MACRO + n. Vial's buffer: the macros one after another, each
+// ending in a 0; text, and 0x01 + code: 1 tap / 2 down / 3 up + 8-bit keycode, 4 delay + 2 bytes,
+// 5 tap / 6 down / 7 up + 16-bit keycode. Stored as a file of its own (remap_store.cpp).
+#define REMAP_MACROS       16
+#define REMAP_MACRO_BUFFER 1024
+uint8_t *remap_macro_buffer();
+void remap_macros_clear();
+// The macro player waits while this says no (the BLE report queue is filling up).
+void remap_set_ready_hook(bool (*ready)());
 bool remap_save_due();                        // a change is 1 s old: true once, then save remap_blob()
 void remap_store_load();
 void remap_store_task();

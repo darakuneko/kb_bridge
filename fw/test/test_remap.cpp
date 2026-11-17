@@ -167,7 +167,7 @@ int main() {
   r = vial({0x11});
   assert(r[1] == REMAP_LAYERS);
   r = vial({0x0C});
-  assert(r[1] == 0);                             // no macros
+  assert(r[1] == REMAP_MACROS);
 
   // default keymap: what the keyboard sends
   key({0x02, 0, 0x04});
@@ -477,6 +477,47 @@ int main() {
   key({0});
   expect({"kb 00 00 00 00 00 00 00"});
   wait_ms(300);
+
+  // macros: count / size, written (unlocked above), read back, played
+  r = vial({0x0C});
+  assert(r[1] == REMAP_MACROS);
+  r = vial({0x0D});
+  assert(((r[1] << 8) | r[2]) == REMAP_MACRO_BUFFER);
+  // M0 = "aB"; M1 = tap A, wait 100 ms, tap LCTL(C) (16-bit keycode 0x0106)
+  const std::vector<uint8_t> mbuf = {'a', 'B', 0, 1, 1, 0x04, 1, 4, 101, 1, 1, 5, 0x06, 0x01, 0};
+  std::vector<uint8_t> setm = {0x0F, 0, 0, (uint8_t)mbuf.size()};
+  setm.insert(setm.end(), mbuf.begin(), mbuf.end());
+  vial(setm);
+  r = vial({0x0E, 0, 0, (uint8_t)mbuf.size()});
+  for (size_t i = 0; i < mbuf.size(); i++) assert(r[4 + i] == mbuf[i]);
+  set_kc(0, 0x11, 0x7700);                       // N = M0
+  set_kc(0, 0x12, 0x7701);                       // O = M1
+  events.clear();
+  key({0, 0, 0x11}); key({0});
+  expect({"kb 00 04 00 00 00 00 00", "kb 00 00 00 00 00 00 00", "kb 02 05 00 00 00 00 00",
+          "kb 00 00 00 00 00 00 00"});
+  key({0, 0, 0x12}); key({0});
+  expect({"kb 00 04 00 00 00 00 00", "kb 00 00 00 00 00 00 00"});
+  wait_ms(150);
+  expect({"kb 01 06 00 00 00 00 00", "kb 00 00 00 00 00 00 00"});
+  // a long macro does not overflow the report queue: 40 characters, all of them sent
+  std::vector<uint8_t> longm = {0x0F, 0, 0, 21};
+  for (int i = 0; i < 20; i++) longm.push_back('x');
+  longm.push_back(0);
+  vial(longm);
+  longm = {0x0F, 0, 21, 21};
+  for (int i = 0; i < 20; i++) longm.push_back('y');
+  longm.push_back(0);
+  vial(longm);                                   // M0 = 20 x, M1 = 20 y
+  key({0, 0, 0x11}); key({0}); key({0, 0, 0x12}); key({0});
+  for (int i = 0; i < 100; i++) bridge_task(true, conn_count);
+  int downs = 0;
+  for (auto &e : events) if (e != "kb 00 00 00 00 00 00 00") downs++;
+  assert(downs == 40 && events.size() == 80);
+  events.clear();
+  vial({0x10});                                  // macro reset
+  r = vial({0x0E, 0, 0, 4});
+  assert(r[4] == 0 && r[5] == 0);
 
   vial({0xFE, 0x0C});                            // QMK settings reset
   r = vial({0xFE, 0x0A, 7, 0});
