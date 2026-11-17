@@ -2,6 +2,7 @@
 #include "bridge.h"
 #include "ble.h"
 #include "hid_parser.h"
+#include "remap.h"
 #include <algorithm>
 #include <vector>
 
@@ -34,6 +35,11 @@ uint8_t cur_mods = 0, cur_keys[6] = {0};
 uint16_t cur_consumer = 0;
 uint8_t cur_system = 0;
 uint8_t cur_buttons = 0;
+// What the keyboard itself sends (consumer / system / mouse buttons); with the bridge's own keymap
+// a keycode that sends one of these overrides it.
+uint16_t kb_consumer = 0;
+uint8_t kb_system = 0;
+uint8_t kb_buttons = 0;
 Ch559Status status;
 uint32_t last_activity_ms = 0;
 uint32_t seen_connect_count = 0;
@@ -129,13 +135,37 @@ KeySource &source(uint16_t key) {
   return key_sources.back();
 }
 
+// The bridge's own keymap (remap.cpp) is used unless the keyboard has Vial / VIA itself.
+bool own_keymap() {
+  for (auto &i : ifaces)
+    if (i.vial) return false;
+  return true;
+}
+
+// Every key held by any source, modifiers as usages 0xE0..0xE7.
+std::vector<uint8_t> held_usages() {
+  std::vector<uint8_t> u;
+  for (auto &s : key_sources) {
+    for (int i = 0; i < 8; i++)
+      if ((s.mods & (1 << i)) && std::find(u.begin(), u.end(), 0xE0 + i) == u.end()) u.push_back(0xE0 + i);
+    for (auto k : s.keys)
+      if (std::find(u.begin(), u.end(), k) == u.end()) u.push_back(k);
+  }
+  return u;
+}
+
 void send_keyboard_if_changed() {
   uint8_t mods = 0;
   std::vector<uint8_t> held;
-  for (auto &s : key_sources) {
-    mods |= s.mods;
-    for (auto k : s.keys)
-      if (std::find(held.begin(), held.end(), k) == held.end()) held.push_back(k);
+  if (own_keymap()) {
+    mods = remap_mods();
+    held = remap_keys();
+  } else {
+    for (auto &s : key_sources) {
+      mods |= s.mods;
+      for (auto k : s.keys)
+        if (std::find(held.begin(), held.end(), k) == held.end()) held.push_back(k);
+    }
   }
   // keep the press order: drop released keys, append new ones
   key_order.erase(std::remove_if(key_order.begin(), key_order.end(),
@@ -155,6 +185,10 @@ void send_keyboard_if_changed() {
 
 void release_all() {
   key_sources.clear();
+  remap_release_all();
+  kb_consumer = 0;
+  kb_system = 0;
+  kb_buttons = 0;
   key_order.clear();
   send_keyboard_if_changed();
   if (cur_consumer) { cur_consumer = 0; queue_consumer(); }
@@ -258,17 +292,39 @@ void process_report(Iface &it, const uint8_t *data, uint8_t len) {
   if (kb) {
     KeySource &s = source(((uint16_t)it.num << 8) | rid);
     active |= s.mods != mods || s.keys != keys || mods || !keys.empty();
+    std::vector<uint8_t> before = held_usages();
     s.mods = mods;
     s.keys = keys;
+    if (own_keymap()) {                        // key events into the keymap: releases first
+      std::vector<uint8_t> after = held_usages();
+      for (auto u : before)
+        if (std::find(after.begin(), after.end(), u) == after.end()) remap_key(u, false);
+      for (auto u : after)
+        if (std::find(before.begin(), before.end(), u) == before.end()) remap_key(u, true);
+    }
     send_keyboard_if_changed();
   }
-  if (consumer && consumer_usage != cur_consumer) {
-    cur_consumer = consumer_usage;
+  if (consumer) kb_consumer = consumer_usage;
+  if (system) kb_system = system_usage;
+  if (mouse) kb_buttons = buttons;
+  bool own = own_keymap();
+  uint16_t want_consumer = own && remap_consumer() ? remap_consumer() : kb_consumer;
+  uint8_t want_system = own && remap_system() ? remap_system() : kb_system;
+  buttons = kb_buttons | (own ? remap_buttons() : 0);
+  int8_t kv = 0, kh = 0;
+  if (own && remap_take_wheel(kv, kh)) {
+    mouse = true;
+    wheel += kv;
+    pan += kh;
+  }
+  if (buttons != cur_buttons) mouse = true;
+  if (want_consumer != cur_consumer) {
+    cur_consumer = want_consumer;
     queue_consumer();
     active = true;
   }
-  if (system && system_usage != cur_system) {
-    cur_system = system_usage;
+  if (want_system != cur_system) {
+    cur_system = want_system;
     queue_system();
     active = true;
   }
@@ -407,7 +463,14 @@ bool vial_output_report(const uint8_t *data, uint16_t len, uint8_t out[32]) {
 }
 
 void bridge_host_vial(const uint8_t data[32]) {
-  if (!enumerated) return;
+  if (!enumerated || own_keymap()) {           // the bridge's own keymap answers
+    uint8_t msg[32];
+    memcpy(msg, data, 32);
+    if (remap_vial(msg)) enqueue(OUT_VIAL, msg, 32);
+    flush();
+    if (enumerated) last_activity_ms = millis();
+    return;
+  }
   last_activity_ms = millis();
   for (auto &it : ifaces) {
     if (!it.vial) continue;

@@ -11,6 +11,7 @@
 #include "bridge.h"
 #include "ble.h"
 #include "ui.h"
+#include "remap.h"
 #include "ch559_isp.h"
 #include "ch559_image.h"
 
@@ -115,6 +116,7 @@ void setup() {
   loop_wake_init();
   nfc_pins_as_gpio();
   ui_begin();
+  remap_store_load();
   ch559_start();
   ble_begin(ui_host());
   last_link_rx_ms = last_ping_ms = millis();
@@ -277,6 +279,43 @@ static void host_switch_task(bool now) {
   ui_save_now();                                   // the bonds moved: the selection must match them
 }
 
+// A host chosen by the buttons (next host) or by a Vial custom key (that host).
+static void request_host(uint8_t host) {
+  if (host_pending < 0 && host == ui_host()) {     // already there: nothing to move
+    ui_flash(true, host + 1);
+    return;
+  }
+  if (host_pending < 0) ble_pause();
+  host_pending = host;
+  host_pending_ms = millis();
+  ui_flash(true, host + 1);
+}
+
+static void keepalive_next() {                     // green x2 weak, green x3 strong, red x2 off
+  switch (ui_next_keepalive()) {
+    case KA_STRONG: ui_flash(true, 3); break;
+    case KA_WEAK: ui_flash(true, 2); break;
+    default: ui_flash(false, 2); break;
+  }
+}
+
+// Vial custom keys (own keymap): the same actions as the buttons.
+static void custom_key_task() {
+  uint8_t id;
+  while (remap_take_custom(id)) {
+    switch (id) {
+      case KBB_HOST1: case KBB_HOST2: case KBB_HOST3: case KBB_HOST4:
+        request_host(id - KBB_HOST1);
+        break;
+      case KBB_KEEPALIVE: keepalive_next(); break;
+      case KBB_JIS_TO_US: ui_flash(true, 1); break;
+      case KBB_US_TO_JIS: ui_flash(true, 2); break;
+      case KBB_NO_CONV: ui_flash(false, 1); break;
+      default: break;
+    }
+  }
+}
+
 void loop() {
   static uint32_t busy_ms;                         // last time there was something to do
   wdt_feed();
@@ -287,6 +326,7 @@ void loop() {
     if (f.type == MSG_HELLO && !ch559_ok && ch559_up_to_date()) ch559_ok = true;
   }
   bridge_task(ble_connected(), ble_connect_count());
+  remap_store_task();
   link_health();
   keyboard_recovery();
   usb_power();
@@ -298,6 +338,7 @@ void loop() {
   if (bridge_pending_reports()) busy_ms = millis();
 
   UiEvent ev = ui_task();
+  custom_key_task();
   host_switch_task(false);
   switch (ev) {
     case UI_PAIR_SHORT:
@@ -309,27 +350,18 @@ void loop() {
       ui_flash(false, 3);
       ble_forget_host();
       break;
-    case UI_BOTH_SHORT: {                            // next host: green x its number (1-4)
+    case UI_BOTH_SHORT:                              // next host: green x its number (1-4)
       // The bonds move (flash writes) only once the presses stop: going round 1 -> 2 -> 3 writes
       // once, and back to where it started not at all.
-      if (host_pending < 0) ble_pause();
-      uint8_t host = ((host_pending < 0 ? ui_host() : host_pending) + 1) % BLE_HOST_COUNT;
-      host_pending = host;
-      host_pending_ms = millis();
-      ui_flash(true, host + 1);
+      request_host(((host_pending < 0 ? ui_host() : host_pending) + 1) % BLE_HOST_COUNT);
       break;
-    }
     case UI_BOTH_LONG:                               // every host
       host_switch_task(true);
       ui_flash(false, 5);
       ble_forget_all();
       break;
     case UI_LOWI_PRESS:
-      switch (ui_next_keepalive()) {                 // green x2 weak, green x3 strong, red x2 off
-        case KA_STRONG: ui_flash(true, 3); break;
-        case KA_WEAK: ui_flash(true, 2); break;
-        default: ui_flash(false, 2); break;
-      }
+      keepalive_next();
       break;
     default:
       break;

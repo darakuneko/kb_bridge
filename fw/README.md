@@ -22,9 +22,15 @@ EXTRA_FLAGS=-DSYSTEM_OFF_IDLE_MS=30000 fw/build.sh   # extra defines, e.g. a 30 
 - `fw/tools/bin/wchisp` is not in the repository. Get it from https://github.com/ch32-rs/wchisp
 - Logic tests (on the PC):
   ```
-  c++ -std=c++17 -I fw/test -I fw/nrf/kb_bridge fw/test/test_bridge.cpp \
-      fw/nrf/kb_bridge/hid_parser.cpp fw/nrf/kb_bridge/bridge.cpp -o /tmp/test_bridge && /tmp/test_bridge
+  c++ -std=c++17 -I fw/test -I fw/nrf/kb_bridge fw/test/test_bridge.cpp fw/nrf/kb_bridge/hid_parser.cpp \
+      fw/nrf/kb_bridge/bridge.cpp fw/nrf/kb_bridge/remap.cpp -o /tmp/test_bridge && /tmp/test_bridge
+  c++ -std=c++17 -I fw/test -I fw/nrf/kb_bridge fw/test/test_remap.cpp fw/nrf/kb_bridge/hid_parser.cpp \
+      fw/nrf/kb_bridge/bridge.cpp fw/nrf/kb_bridge/remap.cpp -o /tmp/test_remap && /tmp/test_remap
   ```
+- KB Bridge's own Vial keymap (keyboards without Vial / VIA): `fw/tools/vial_def.py` generates the
+  Vial definition and the virtual matrix (`nrf/kb_bridge/vial_def.h`, `nrf/kb_bridge/remap_matrix.h`;
+  both are committed). After changing the layout or the custom keycodes:
+  `cd fw/nrf/kb_bridge && python3 ../../tools/vial_def.py vial_def.h remap_matrix.h`
 
 ## Flashing
 
@@ -76,6 +82,7 @@ The CH559 only relays. When a device attaches it sends the HID interfaces and re
 |---|---|
 | BLE HID | Keyboard (6KRO, boot protocol), consumer, system, mouse. NKRO and multiple interfaces on the USB side are merged and sent as 6KRO |
 | Vial | A second HID service (usage page 0xFF60, 32 bytes) relayed as is to the keyboard's raw HID. The output report takes 32 bytes, or 33 with a leading report id 0 (what BlueZ on Linux sends; the 0 is removed). DIS serial number = `vial:f64c2b3c:XXXXXX`. ATT MTU 64 (with the default 23, 32-byte reports are split into 20+12 and the host drops them). The zero-length packet a keyboard sends after a reply is dropped. DIS PnP ID = KB Bridge's own 7A79:1576 (the attached keyboard's id is not passed on). While Vial talks (10 s after the last request) slave latency is off (otherwise requests arrive bunched, Unlock polls come less than 100 ms apart and the count resets) |
+| Own keymap (Vial) | Used when the keyboard has no Vial / VIA (no 0xFF60 interface), and when none is attached; a keyboard with Vial keeps its own (pass-through, above). The bridge answers Vial itself as "KB Bridge": a virtual matrix built from HID usages (9 rows x 22 columns, one row per row of keys of the layout, so the matrix tester works), 8 layers, layout ALL (default, every usage) / JIS / US, unlock = hold Esc + Enter. Keycodes: basic, mods, mod + key, MO / TG / TO / DF / LM, media, system, mouse buttons, wheel steps. Custom keycodes (Vial USER tab): Host 1-4, Keep alive (like LOW-I), JIS→US (JIS keyboard, OS set to US), US→JIS (US keyboard, OS set to JIS), No conv. The conversion swaps key + shift for the ~20 symbol keys that differ and is saved. Keymap saved 3 s after the last change, only when it changed (`/kbb_keymap`) |
 | Keyboard LEDs | Host LED output → the keyboard's LED output reports (all of them, including ones with a report id) |
 | Keyboard power | VBUS_KB is switched on only when CC shows an Rd (0.44 V). A PC or charger plugged into J2 gets no 5 V |
 | Keep-alive | LOW-I cycles weak → strong → off (saved, default weak). Strong: 200 ms every 5 s at ~150 mA (~6 mA average). Weak: 50 ms every 10 s (~0.75 mA average, for power banks in their own low-current mode). Makers differ: tune `KEEPALIVE_WEAK_*` |
@@ -87,6 +94,7 @@ The CH559 only relays. When a device attaches it sends the HID interfaces and re
 ## Not implemented / later
 
 - NKRO BLE reports, battery service
+- Own keymap: Mod-Tap / Layer-Tap, one-shot, macros, combos, mouse movement keys
 
 ## About licenses
 
