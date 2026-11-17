@@ -6,7 +6,7 @@ enum UiEvent : uint8_t {
   UI_NONE,
   UI_PAIR_SHORT,       // PAIR pressed and released (< BTN_LONG_MS)
   UI_PAIR_LONG,        // PAIR held BTN_LONG_MS
-  UI_LOWI_PRESS,       // LOW-I pressed and released
+  UI_LOWI_PRESS,       // LOW-I pressed and released (held BTN_LONG_MS or more: nothing)
   UI_BOTH_SHORT,       // PAIR and LOW-I down together, then both released (< BTN_LONG_MS together)
   UI_BOTH_LONG,        // PAIR and LOW-I held together BTN_LONG_MS
 };
@@ -36,6 +36,7 @@ uint32_t ui_ms_to_next_event();         // a keep-alive pulse ends then (loop() 
 bool ui_battery_low();
 uint16_t ui_vin_mv();
 bool ui_pair_held();                    // raw (for boot-time checks)
+bool ui_lowi_held();                    // raw (Vial unlock: LOW-I held counts as the unlock keys)
 bool ui_keyboard_powered();
 void ui_kb_power_cycle(uint32_t off_ms);
 void ui_save_now();                     // pending setting changes to flash now (normally SETTINGS_SAVE_DELAY_MS later)

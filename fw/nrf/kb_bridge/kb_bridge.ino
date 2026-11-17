@@ -117,6 +117,7 @@ void setup() {
   nfc_pins_as_gpio();
   ui_begin();
   remap_store_load();
+  remap_set_unlock_button(ui_lowi_held);
   ch559_start();
   ble_begin(ui_host());
   last_link_rx_ms = last_ping_ms = millis();

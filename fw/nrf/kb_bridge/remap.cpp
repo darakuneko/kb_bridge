@@ -479,7 +479,10 @@ const Qs *find_qs(uint16_t qsid) {
   return nullptr;
 }
 
+bool (*unlock_button)() = nullptr;
+
 bool unlock_keys_held() {
+  if (unlock_button && unlock_button()) return true;
   for (uint8_t u : UNLOCK_USAGES)
     if (!pos_down[remap_pos(u)]) return false;
   return true;
@@ -1224,6 +1227,7 @@ void remap_key(uint8_t usage, bool pressed) {
 
 void remap_set_report_hook(void (*hook)()) { report_hook = hook; }
 void remap_set_ready_hook(bool (*ready)()) { ready_hook = ready; }
+void remap_set_unlock_button(bool (*held)()) { unlock_button = held; }
 uint8_t *remap_macro_buffer() { return macro_buf; }
 void remap_macros_clear() { memset(macro_buf, 0, sizeof(macro_buf)); }
 

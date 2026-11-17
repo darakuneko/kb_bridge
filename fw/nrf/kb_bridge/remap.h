@@ -46,6 +46,10 @@ bool remap_take_custom(uint8_t &id);          // a custom key pressed since the 
 enum : uint8_t { REMAP_CONV_NONE, REMAP_CONV_JIS_TO_US, REMAP_CONV_US_TO_JIS };
 uint8_t remap_conversion();
 
+// Vial unlock: besides holding Esc + Enter, this button (LOW-I) held counts too (a macropad may
+// have neither key).
+void remap_set_unlock_button(bool (*held)());
+
 // Vial / VIA raw HID command, answered in place (32 bytes). false: send no answer.
 bool remap_vial(uint8_t msg[32]);
 

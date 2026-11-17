@@ -589,6 +589,24 @@ int main() {
   vial({0xFE, 0x0D, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});    // cleared
   wait_ms(300);
 
+  // unlock with the LOW-I button held instead of Esc + Enter (a macropad may have neither)
+  static bool lowi = false;
+  remap_set_unlock_button([] { return lowi; });
+  vial({0xFE, 0x08});                            // lock
+  r = vial({0xFE, 0x05});
+  assert(r[0] == 0);
+  vial({0xFE, 0x06});                            // unlock start
+  lowi = true;
+  r = last_vial;
+  for (int i = 0; i < 60 && !(i && r[0] == 1); i++) {
+    for (int t = 0; t < 120; t++) millis();
+    r = vial({0xFE, 0x07});
+  }
+  assert(r[0] == 1);
+  lowi = false;
+  remap_set_unlock_button(nullptr);
+  events.clear();
+
   vial({0xFE, 0x0C});                            // QMK settings reset
   r = vial({0xFE, 0x0A, 7, 0});
   assert(r[1] == 200);

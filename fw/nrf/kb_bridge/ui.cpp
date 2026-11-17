@@ -210,6 +210,8 @@ UiEvent button_task() {
   } else if (pair_btn.down && now - pair_btn.since >= BTN_LONG_MS) {
     long_sent = true;
     return UI_PAIR_LONG;
+  } else if (lowi_btn.down && now - lowi_btn.since >= BTN_LONG_MS) {
+    long_sent = true;                              // LOW-I held (Vial unlock): no keep-alive change on release
   }
   return UI_NONE;
 }
@@ -340,6 +342,7 @@ void ui_set_host(uint8_t host) {
 bool ui_battery_low() { return vin_low; }
 uint16_t ui_vin_mv() { return vin_mv; }
 bool ui_pair_held() { return digitalRead(PIN_BTN_PAIR) == LOW; }
+bool ui_lowi_held() { return digitalRead(PIN_BTN_LOWI) == LOW; }
 bool ui_keyboard_powered() { return kb_power; }
 
 void ui_kb_power_cycle(uint32_t off_ms) {

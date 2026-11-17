@@ -119,7 +119,9 @@
       <tr><td>PAIR</td><td>Short press</td><td>Start waiting for a connection (to pair with another device)</td></tr>
       <tr><td>PAIR</td><td>Hold 3 s</td><td>Forget the pairings of the selected device slot (LED red ×3)</td></tr>
       <tr><td>PAIR</td><td>Hold while plugging in USB</td><td>Firmware update mode</td></tr>
-      <tr><td>LOW-I</td><td>Press and release</td><td>Cycle the power-bank keep-alive: weak → strong → off (saved; default weak)</td></tr>
+      <tr><td>LOW-I</td><td>Press and release (under 3 s)</td><td>Cycle the power-bank keep-alive: weak → strong → off (saved; default weak; LED green ×2 = weak, green ×3 = strong, red ×2 = off)</td></tr>
+      <tr><td>LOW-I</td><td>Hold (when Vial asks to unlock)</td><td>Unlock (about 5 s). Released after 3 s or more, it does not change the keep-alive</td></tr>
+      <tr><td>LOW-I</td><td>Press (while switched off automatically)</td><td>Start up (plugging / unplugging the keyboard does too)</td></tr>
       <tr><td>PAIR and LOW-I</td><td>Press together and release</td><td>Switch to the next device slot (1 → 2 → 3 → 4 → 1; LED green as many times as its number)</td></tr>
       <tr><td>PAIR and LOW-I</td><td>Hold together 3 s</td><td>Forget the pairings of every slot (LED red ×5)</td></tr>
     </table>
@@ -178,7 +180,7 @@
     <ul>
       <li>Features: 8 layers, Mod-Tap / Layer-Tap, one-shot keys, TT, tap dance (16), macros (16), combos (16), key overrides (16), mouse keys, media keys; the tapping term and other settings can be changed</li>
       <li>Layout (Vial's Layout): ALL (default: the US layout plus every other key KB Bridge handles) / JIS / US</li>
-      <li>Changing the keymap or editing macros needs unlocking: hold Esc and Enter together</li>
+      <li>Changing the keymap or editing macros needs unlocking: when Vial asks, hold Esc and Enter together, or hold the LOW-I button on KB Bridge (for a macropad without Esc or Enter)</li>
       <li>Changes are saved 3 s after the last change once Vial has gone quiet too. Wait a moment before switching it off</li>
     </ul>
     <p>Of the keys Vial lists, these work in KB Bridge and these do nothing when pressed:</p>
