@@ -16,21 +16,8 @@
             "build_id": "0xFF329865"
           },
           "notes": {
-            "ja": "KB Bridge のキーマップ（Vial にも VIA にも対応していないキーボード用）で、レイアウト ALL を US 配列ベースに（JIS 固有のキーは下の段）。Vial のロック解除を、KB Bridge の LOW-I ボタンの長押しでもできるように（Esc や Enter のないマクロパッド向け）。0.5.4 で KB Bridge のキーマップを変更していた場合は初期値に戻るので、設定し直してください。",
-            "en": "KB Bridge's keymap (for keyboards that support neither Vial nor VIA): the ALL layout is now the US layout (the JIS-only keys are in the rows below). Vial can also be unlocked by holding the LOW-I button on KB Bridge (for macropads without Esc or Enter). A keymap changed with 0.5.4 goes back to the defaults: set it again."
-          }
-        },
-        {
-          "version": "0.5.4",
-          "date": "2026-11-17",
-          "file": "firmware/v0.7/kb_bridge_v0.7_0.5.4_20261117.zip",
-          "ch559": {
-            "file": "firmware/v0.7/kb_bridge_ch559_v0.7_0.5.4_20261117.bin",
-            "build_id": "0xFF329865"
-          },
-          "notes": {
-            "ja": "Vial にも VIA にも対応していないキーボード（市販のキーボードなど）のキーを、KB Bridge 側で入れ替えられるように。Vial や Pipette に「KB Bridge」として見えます（8 レイヤー、Mod-Tap / Layer-Tap、タップダンス、マクロ、コンボ、キーオーバーライド、マウスキー、JIS / US 変換、接続先の切り替えキーなど）。Vial や VIA に対応したキーボードは今まで通り、キーボードのキーマップのまま動きます（対応表はガイドの「Vial」）。",
-            "en": "Remap keyboards that support neither Vial nor VIA (off-the-shelf keyboards, for example) in KB Bridge itself: it shows up in Vial and Pipette as \"KB Bridge\" (8 layers, Mod-Tap / Layer-Tap, tap dance, macros, combos, key overrides, mouse keys, JIS / US conversion, host switch keys and more). Vial and VIA keyboards keep their own keymap as before (see the table under \"Vial\" in the guide)."
+            "ja": "Vial にも VIA にも対応していないキーボード（市販のキーボードなど）のキーを、KB Bridge 側で入れ替えられるように。KB Bridge が Vial プロトコルに対応した「KB Bridge」として Vial や Pipette に見えます（8 レイヤー、Mod-Tap / Layer-Tap、タップダンス、マクロ、コンボ、キーオーバーライド、マウスキー、JIS / US 変換、接続先の切り替えキーなど）。何も変更しなければ、キーボードのキーマップのまま動きます。ロック解除は Esc + Enter か、LOW-I ボタンの長押しで行います。Vial や VIA に対応したキーボードは今まで通り、キーボードのキーマップのまま動きます（対応表はガイドの「Vial」）。",
+            "en": "Remap keyboards that support neither Vial nor VIA (off-the-shelf keyboards, for example) in KB Bridge itself: KB Bridge shows up in Vial and Pipette as \"KB Bridge\", speaking the Vial protocol (8 layers, Mod-Tap / Layer-Tap, tap dance, macros, combos, key overrides, mouse keys, JIS / US conversion, host switch keys and more). With nothing changed, the keyboard works as it is. Unlock with Esc + Enter or by holding the LOW-I button. Vial and VIA keyboards keep their own keymap as before (see the table under \"Vial\" in the guide)."
           }
         },
         {
