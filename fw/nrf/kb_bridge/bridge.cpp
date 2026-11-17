@@ -206,6 +206,49 @@ void forget_device() {
 int8_t clamp8(int32_t v) { return v > 127 ? 127 : v < -127 ? -127 : (int8_t)v; }
 
 // Decode one input report of an interface.
+// What the keyboard sends (kb_*, motion) merged with what the bridge's own keymap sends: queue the
+// reports that changed. true: something was queued.
+bool push_outputs(bool mouse, int32_t x, int32_t y, int32_t wheel, int32_t pan) {
+  bool active = false;
+  bool own = own_keymap();
+  if (own) send_keyboard_if_changed();
+  uint16_t want_consumer = own && remap_consumer() ? remap_consumer() : kb_consumer;
+  uint8_t want_system = own && remap_system() ? remap_system() : kb_system;
+  uint8_t buttons = kb_buttons | (own ? remap_buttons() : 0);
+  int8_t kv = 0, kh = 0;
+  if (own && remap_take_wheel(kv, kh)) {
+    mouse = true;
+    wheel += kv;
+    pan += kh;
+  }
+  if (buttons != cur_buttons) mouse = true;
+  if (want_consumer != cur_consumer) {
+    cur_consumer = want_consumer;
+    queue_consumer();
+    active = true;
+  }
+  if (want_system != cur_system) {
+    cur_system = want_system;
+    queue_system();
+    active = true;
+  }
+  if (mouse && (buttons != cur_buttons || x || y || wheel || pan)) {
+    // relative motion is sent in pieces the BLE report can carry
+    do {
+      int8_t sx = clamp8(x), sy = clamp8(y), sw = clamp8(wheel), sp = clamp8(pan);
+      queue_mouse(buttons, sx, sy, sw, sp);
+      x -= sx; y -= sy; wheel -= sw; pan -= sp;
+    } while (x || y || wheel || pan);
+    cur_buttons = buttons;
+    active = true;
+  }
+  return active;
+}
+
+// The keymap needs a report boundary (a tap: its press must go out before its release).
+void keymap_report() { push_outputs(false, 0, 0, 0, 0); }
+struct KeymapHook { KeymapHook() { remap_set_report_hook(keymap_report); } } keymap_hook;
+
 void process_report(Iface &it, const uint8_t *data, uint8_t len) {
   if (it.vial) {
     uint8_t buf[32] = {0};
@@ -307,37 +350,7 @@ void process_report(Iface &it, const uint8_t *data, uint8_t len) {
   if (consumer) kb_consumer = consumer_usage;
   if (system) kb_system = system_usage;
   if (mouse) kb_buttons = buttons;
-  bool own = own_keymap();
-  uint16_t want_consumer = own && remap_consumer() ? remap_consumer() : kb_consumer;
-  uint8_t want_system = own && remap_system() ? remap_system() : kb_system;
-  buttons = kb_buttons | (own ? remap_buttons() : 0);
-  int8_t kv = 0, kh = 0;
-  if (own && remap_take_wheel(kv, kh)) {
-    mouse = true;
-    wheel += kv;
-    pan += kh;
-  }
-  if (buttons != cur_buttons) mouse = true;
-  if (want_consumer != cur_consumer) {
-    cur_consumer = want_consumer;
-    queue_consumer();
-    active = true;
-  }
-  if (want_system != cur_system) {
-    cur_system = want_system;
-    queue_system();
-    active = true;
-  }
-  if (mouse && (buttons != cur_buttons || x || y || wheel || pan)) {
-    // relative motion is sent in pieces the BLE report can carry
-    do {
-      int8_t sx = clamp8(x), sy = clamp8(y), sw = clamp8(wheel), sp = clamp8(pan);
-      queue_mouse(buttons, sx, sy, sw, sp);
-      x -= sx; y -= sy; wheel -= sw; pan -= sp;
-    } while (x || y || wheel || pan);
-    cur_buttons = buttons;
-    active = true;
-  }
+  active |= push_outputs(mouse, x, y, wheel, pan);
   // sent from bridge_task(), once per loop(): a blocking send here would keep the frames of a
   // fast trackpad coming and loop() from ever feeding the watchdog
   if (active) last_activity_ms = millis();
@@ -495,6 +508,8 @@ uint32_t bridge_last_activity_ms() { return last_activity_ms; }
 size_t bridge_pending_reports() { return out_count; }
 
 void bridge_task(bool connected, uint32_t connect_count) {
+  if (enumerated && own_keymap() && remap_task() && push_outputs(false, 0, 0, 0, 0))
+    last_activity_ms = millis();                // a tap-hold key decided by time, a one-shot timed out
   if (connect_count != seen_connect_count) {   // new connection: send the current state once
     seen_connect_count = connect_count;
     requeue_current_state();

@@ -17,7 +17,8 @@ static bool record(const char *s) {
   events.push_back(s);
   return true;
 }
-uint32_t millis() { static uint32_t t = 0; return t += 1; }
+static uint32_t clk = 0;                  // ms; every call moves it on by one, wait_ms() by more
+uint32_t millis() { return clk += 1; }
 bool ble_keyboard(uint8_t mods, const uint8_t k[6]) {
   snprintf(tmp, sizeof tmp, "kb %02x %02x %02x %02x %02x %02x %02x", mods, k[0], k[1], k[2], k[3], k[4], k[5]);
   return record(tmp);
@@ -312,6 +313,174 @@ int main() {
   key({0, 0, 0x2E}); key({0});
   expect({"kb 00 2e 00 00 00 00 00", "kb 00 00 00 00 00 00 00"});
   while (remap_take_custom(id)) {}
+
+  // ---- tap-hold, one-shot, TT -------------------------------------------------------------
+  auto wait_ms = [](uint32_t ms) { clk += ms; bridge_task(true, conn_count); };
+  auto qs_set = [](uint16_t qsid, uint16_t v) {
+    vial({0xFE, 0x0B, (uint8_t)qsid, (uint8_t)(qsid >> 8), (uint8_t)v, (uint8_t)(v >> 8)});
+  };
+  set_kc(0, 0x04, 0x2204);                       // A = MT(LSFT, A)
+  set_kc(0, 0x05, 0x4105);                       // B = LT(1, B)
+  set_kc(1, 0x06, 0x001B);                       // layer 1: C = X
+  wait_ms(300);
+  events.clear();
+
+  // MT tapped
+  key({0, 0, 0x04}); wait_ms(10); key({0});
+  expect({"kb 00 04 00 00 00 00 00", "kb 00 00 00 00 00 00 00"});
+  wait_ms(300);
+  // MT held past the term: shift, alone, then with C
+  key({0, 0, 0x04}); wait_ms(250);
+  expect({"kb 02 00 00 00 00 00 00"});
+  key({0, 0, 0x04, 0x06}); key({0, 0, 0x04}); key({0});
+  expect({"kb 02 06 00 00 00 00 00", "kb 02 00 00 00 00 00 00", "kb 00 00 00 00 00 00 00"});
+  wait_ms(300);
+  // rolling: A down, C down, A up inside the term: a, then c
+  key({0, 0, 0x04}); key({0, 0, 0x04, 0x06}); key({0, 0, 0x06}); key({0});
+  expect({"kb 00 04 00 00 00 00 00", "kb 00 00 00 00 00 00 00", "kb 00 06 00 00 00 00 00",
+          "kb 00 00 00 00 00 00 00"});
+  wait_ms(300);
+  // A down, C down, the term over: shift + C
+  key({0, 0, 0x04}); key({0, 0, 0x04, 0x06}); wait_ms(250);
+  expect({"kb 02 06 00 00 00 00 00"});
+  key({0, 0, 0x04}); key({0});
+  expect({"kb 02 00 00 00 00 00 00", "kb 00 00 00 00 00 00 00"});
+  wait_ms(300);
+
+  // QMK settings: the supported qsids, get / set
+  r = vial({0xFE, 0x09, 0, 0});
+  const uint16_t want_qs[] = {5, 6, 7, 20, 22, 23, 24, 25};
+  for (int i = 0; i < 8; i++) assert((r[i * 2] | (r[i * 2 + 1] << 8)) == want_qs[i]);
+  assert(r[16] == 0xFF && r[17] == 0xFF);
+  r = vial({0xFE, 0x0A, 7, 0});
+  assert(r[0] == 0 && r[1] == 200 && r[2] == 0);
+
+  // permissive hold: C pressed and released inside the term -> shift + C
+  qs_set(22, 1);
+  key({0, 0, 0x04}); key({0, 0, 0x04, 0x06}); key({0, 0, 0x04});
+  expect({"kb 02 06 00 00 00 00 00", "kb 02 00 00 00 00 00 00"});
+  key({0});
+  expect({"kb 00 00 00 00 00 00 00"});
+  qs_set(22, 0);
+  wait_ms(300);
+  // hold on other key press: C down -> held at once
+  qs_set(23, 1);
+  key({0, 0, 0x04}); key({0, 0, 0x04, 0x06});
+  expect({"kb 02 06 00 00 00 00 00"});
+  key({0, 0, 0x04}); key({0});
+  expect({"kb 02 00 00 00 00 00 00", "kb 00 00 00 00 00 00 00"});
+  qs_set(23, 0);
+  wait_ms(300);
+  // retro tapping: held alone past the term, released: still types a
+  qs_set(24, 1);
+  key({0, 0, 0x04}); wait_ms(250); key({0});
+  expect({"kb 02 00 00 00 00 00 00", "kb 00 00 00 00 00 00 00", "kb 00 04 00 00 00 00 00",
+          "kb 00 00 00 00 00 00 00"});
+  qs_set(24, 0);
+  wait_ms(300);
+  // quick tap: tapped, then pressed again at once: a held (key repeat)
+  key({0, 0, 0x04}); key({0}); key({0, 0, 0x04}); wait_ms(300);
+  expect({"kb 00 04 00 00 00 00 00", "kb 00 00 00 00 00 00 00", "kb 00 04 00 00 00 00 00"});
+  key({0});
+  expect({"kb 00 00 00 00 00 00 00"});
+  wait_ms(300);
+  // tapping term from the settings
+  qs_set(7, 400);
+  r = vial({0xFE, 0x0A, 7, 0});
+  assert(r[1] == (400 & 0xFF) && r[2] == (400 >> 8));
+  key({0, 0, 0x04}); wait_ms(300); key({0});    // 300 < 400: a tap
+  expect({"kb 00 04 00 00 00 00 00", "kb 00 00 00 00 00 00 00"});
+  qs_set(7, 200);
+  wait_ms(300);
+
+  // LT: held -> layer 1 (C = X), tapped -> b
+  key({0, 0, 0x05}); wait_ms(250);
+  key({0, 0, 0x05, 0x06}); key({0, 0, 0x05}); key({0});
+  expect({"kb 00 1b 00 00 00 00 00", "kb 00 00 00 00 00 00 00"});
+  wait_ms(300);
+  key({0, 0, 0x05}); key({0});
+  expect({"kb 00 05 00 00 00 00 00", "kb 00 00 00 00 00 00 00"});
+  wait_ms(300);
+
+  // OSM(LSFT) on D: tapped -> the next key shifted, the one after not
+  set_kc(0, 0x07, 0x52A2);
+  key({0, 0, 0x07}); key({0});
+  expect({"kb 02 00 00 00 00 00 00", "kb 00 00 00 00 00 00 00"});
+  key({0, 0, 0x08}); key({0}); key({0, 0, 0x08}); key({0});
+  expect({"kb 02 08 00 00 00 00 00", "kb 00 00 00 00 00 00 00", "kb 00 08 00 00 00 00 00",
+          "kb 00 00 00 00 00 00 00"});
+  // held with another key: a plain shift, nothing left over
+  key({0, 0, 0x07}); key({0, 0, 0x07, 0x08}); key({0, 0, 0x07}); key({0}); key({0, 0, 0x08}); key({0});
+  expect({"kb 02 00 00 00 00 00 00", "kb 02 08 00 00 00 00 00", "kb 02 00 00 00 00 00 00",
+          "kb 00 00 00 00 00 00 00", "kb 00 08 00 00 00 00 00", "kb 00 00 00 00 00 00 00"});
+  // one-shot timeout
+  qs_set(6, 500);
+  key({0, 0, 0x07}); key({0}); wait_ms(600); key({0, 0, 0x08}); key({0});
+  expect({"kb 02 00 00 00 00 00 00", "kb 00 00 00 00 00 00 00", "kb 00 08 00 00 00 00 00",
+          "kb 00 00 00 00 00 00 00"});
+  qs_set(6, 0);
+  wait_ms(300);
+
+  // OSL(1) on F: tapped -> the next key from layer 1 (C = X), the one after from layer 0
+  set_kc(0, 0x09, 0x5281);
+  key({0, 0, 0x09}); key({0}); key({0, 0, 0x06}); key({0}); key({0, 0, 0x06}); key({0});
+  expect({"kb 00 1b 00 00 00 00 00", "kb 00 00 00 00 00 00 00", "kb 00 06 00 00 00 00 00",
+          "kb 00 00 00 00 00 00 00"});
+  wait_ms(300);
+
+  // TT(1) on G: held = MO(1); tapped 5 times = layer 1 on, 5 more = off
+  set_kc(0, 0x0A, 0x52C1);
+  key({0, 0, 0x0A}); key({0, 0, 0x0A, 0x06}); key({0, 0, 0x0A}); key({0});
+  expect({"kb 00 1b 00 00 00 00 00", "kb 00 00 00 00 00 00 00"});
+  wait_ms(300);
+  for (int i = 0; i < 5; i++) { key({0, 0, 0x0A}); key({0}); }
+  key({0, 0, 0x06}); key({0});
+  expect({"kb 00 1b 00 00 00 00 00", "kb 00 00 00 00 00 00 00"});
+  wait_ms(300);
+  for (int i = 0; i < 5; i++) { key({0, 0, 0x0A}); key({0}); }
+  key({0, 0, 0x06}); key({0});
+  expect({"kb 00 06 00 00 00 00 00", "kb 00 00 00 00 00 00 00"});
+
+  // tap dance: TD(0) on M; tap = h, hold = i, double tap = j, tap + hold = k
+  r = vial({0xFE, 0x0D, 0x00});
+  assert(r[0] == REMAP_TAP_DANCES && r[1] == 0 && r[2] == 0);
+  vial({0xFE, 0x0D, 0x02, 0, 0x0B, 0, 0x0C, 0, 0x0D, 0, 0x0E, 0, 0, 0});
+  r = vial({0xFE, 0x0D, 0x01, 0});
+  assert(r[0] == 0 && r[1] == 0x0B && r[3] == 0x0C && r[5] == 0x0D && r[7] == 0x0E && r[9] == 0);
+  set_kc(0, 0x10, 0x5700);
+  wait_ms(300);
+  events.clear();
+  key({0, 0, 0x10}); key({0}); wait_ms(250);                       // tap
+  expect({"kb 00 0b 00 00 00 00 00", "kb 00 00 00 00 00 00 00"});
+  key({0, 0, 0x10}); wait_ms(250);                                 // hold
+  expect({"kb 00 0c 00 00 00 00 00"});
+  key({0});
+  expect({"kb 00 00 00 00 00 00 00"});
+  key({0, 0, 0x10}); key({0}); key({0, 0, 0x10}); key({0}); wait_ms(250);   // double tap
+  expect({"kb 00 0d 00 00 00 00 00", "kb 00 00 00 00 00 00 00"});
+  key({0, 0, 0x10}); key({0}); key({0, 0, 0x10}); wait_ms(250);            // tap, then hold
+  expect({"kb 00 0e 00 00 00 00 00"});
+  key({0});
+  expect({"kb 00 00 00 00 00 00 00"});
+  key({0, 0, 0x10}); key({0}); key({0, 0, 0x06}); key({0});                // tap, then another key
+  expect({"kb 00 0b 00 00 00 00 00", "kb 00 00 00 00 00 00 00", "kb 00 06 00 00 00 00 00",
+          "kb 00 00 00 00 00 00 00"});
+  wait_ms(300);
+  // the entry's term (1000) is for holding; a released tap still goes after the tapping term (200)
+  vial({0xFE, 0x0D, 0x02, 0, 0x0B, 0, 0x0C, 0, 0x0D, 0, 0x0E, 0, 0xE8, 0x03});
+  key({0, 0, 0x10}); key({0}); wait_ms(250);
+  expect({"kb 00 0b 00 00 00 00 00", "kb 00 00 00 00 00 00 00"});
+  key({0, 0, 0x10}); wait_ms(500);                                 // held 500 < 1000: not yet
+  expect({});
+  wait_ms(600);
+  expect({"kb 00 0c 00 00 00 00 00"});
+  key({0});
+  expect({"kb 00 00 00 00 00 00 00"});
+  wait_ms(300);
+
+  vial({0xFE, 0x0C});                            // QMK settings reset
+  r = vial({0xFE, 0x0A, 7, 0});
+  assert(r[1] == 200);
 
   printf("all remap tests passed\n");
   return 0;

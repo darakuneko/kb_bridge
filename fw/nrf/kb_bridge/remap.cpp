@@ -3,6 +3,8 @@
 #include "remap.h"
 #include "vial_def.h"
 #include <algorithm>
+#include <cstddef>
+#include <climits>
 
 namespace {
 
@@ -10,7 +12,7 @@ namespace {
 constexpr uint16_t VIA_PROTOCOL = 0x0009;
 constexpr uint32_t VIAL_PROTOCOL = 6;
 const uint8_t VIAL_UID[8] = {0x4B, 0x42, 0x42, 0x52, 0x7A, 0x79, 0x15, 0x76};   // "KBBR" + VID/PID
-constexpr uint32_t BLOB_MAGIC = 0x4B424B33;     // "KBK3" (9 x 22 matrix, conversion)
+constexpr uint32_t BLOB_MAGIC = 0x4B424B35;     // "KBK5" (9 x 22 matrix, conversion, settings, tap dance)
 constexpr uint32_t DEFAULT_LAYOUT = 0;          // ALL
 constexpr uint32_t SAVE_DELAY_MS = 3000;
 
@@ -39,6 +41,10 @@ constexpr uint16_t KC_NO = 0x0000, KC_TRNS = 0x0001;
 constexpr uint16_t QK_MODS = 0x0100, QK_MODS_MAX = 0x1FFF;
 constexpr uint16_t QK_LAYER_MOD = 0x5000, QK_LAYER_MOD_MAX = 0x51FF;
 constexpr uint16_t QK_KB = 0x7E00;             // Vial custom keycodes (USER tab)
+constexpr uint16_t QK_MOD_TAP = 0x2000, QK_MOD_TAP_MAX = 0x3FFF;       // MT(mods, kc)
+constexpr uint16_t QK_LAYER_TAP = 0x4000, QK_LAYER_TAP_MAX = 0x4FFF;   // LT(layer, kc)
+constexpr uint16_t QK_ONE_SHOT_LAYER = 0x5280, QK_ONE_SHOT_MOD = 0x52A0, QK_LAYER_TAP_TOGGLE = 0x52C0;
+constexpr uint16_t QK_TAP_DANCE = 0x5700;
 constexpr uint16_t QK_TO = 0x5200, QK_MOMENTARY = 0x5220, QK_DEF_LAYER = 0x5240,
                    QK_TOGGLE_LAYER = 0x5260, QK_PERSISTENT_DEF_LAYER = 0x52E0;
 
@@ -145,6 +151,7 @@ const Conv *find_conv(const Conv (&t)[N], uint8_t kc, uint8_t shift) {
 RemapBlob blob;
 bool dirty = false;
 uint32_t changed_ms = 0;
+uint32_t last_vial_ms = 0;                    // last Vial request
 
 uint32_t layer_state = 0, default_layer_state = 1;
 bool pos_down[REMAP_POSITIONS];
@@ -160,6 +167,57 @@ int8_t wheel_v = 0, wheel_h = 0;
 // conversion: the converted key pressed last decides the shift state while it is held
 int conv_pos = -1;
 uint8_t conv_shift = 0;
+
+void (*report_hook)() = nullptr;
+void report() { if (report_hook) report_hook(); }    // a report boundary (a tap: press, then release)
+
+// Tap-hold (MT / LT): pressed, not yet known to be a tap or a hold. The key events after it wait
+// here until that is decided (released before the tapping term: tap; the term over, or another
+// key with the permissive hold / hold on other key press settings: hold), then go on in order.
+struct KeyEv { uint8_t usage; bool pressed; };
+struct Pending {
+  bool active = false;
+  int pos = -1;
+  uint16_t kc = 0;
+  uint32_t ms = 0;
+  uint8_t n = 0;
+  KeyEv buf[16];
+} pend;
+int last_tap_pos = -1;                        // quick tap: the same tap-hold key again, soon
+uint32_t last_tap_ms = 0;
+uint32_t press_seq = 0;                       // key presses so far (retro tapping)
+int retro_pos = -1;                           // held tap-hold key that still taps if released alone
+uint8_t retro_kc = 0;
+uint32_t retro_seq = 0;
+uint32_t pos_ms[REMAP_POSITIONS];             // press time
+
+// One-shot mods / layer (OSM / OSL)
+int os_key_pos = -1;                          // the one-shot key held now
+bool os_key_used = false;                     // another key pressed while it was held
+uint8_t osm_armed = 0, osm_locked = 0;        // HID mod bits for the next key / locked on
+int8_t osl_armed = -1, osl_locked = -1;       // layer for the next key / locked on
+uint32_t os_ms = 0;                           // armed at (timeout)
+int os_tap_pos = -1;                          // tap toggle: taps of the same one-shot key
+uint8_t os_taps = 0;
+uint32_t os_tap_ms = 0;
+uint8_t os_mods_at[REMAP_POSITIONS];          // one-shot mods given to a key, taken back at release
+
+// Tap dance: the one being counted, and what a finished one keeps down until its key is released
+struct Dance {
+  bool active = false;
+  uint8_t idx = 0;
+  int pos = -1;
+  uint8_t count = 0;
+  bool pressed = false, interrupted = false;
+  uint32_t ms = 0;                            // last press: the entry's term runs from there
+} dance;
+int dance_held_pos = -1;
+uint16_t dance_held_kc = 0;
+
+// TT: taps per layer, and the layers it toggled on
+uint8_t tt_taps[REMAP_LAYERS];
+uint32_t tt_ms[REMAP_LAYERS];
+uint32_t tt_toggled = 0;
 
 uint8_t custom_queue[8], custom_head = 0, custom_tail = 0;
 
@@ -259,6 +317,36 @@ void action(uint16_t kc, bool down) {
 
 void put32be(uint8_t *d, uint32_t v) { d[0] = v >> 24; d[1] = v >> 16; d[2] = v >> 8; d[3] = v; }
 
+// ---- QMK settings (Vial protocol: query / get / set / reset by qsid) ------------------------
+void settings_defaults() {
+  RemapSettings &c = blob.settings;
+  memset(&c, 0, sizeof(c));
+  c.tapping_term = 200;
+  c.quick_tap_term = 200;
+  c.osk_timeout = 0;
+  c.tapping_flags = 0;
+  c.osk_tap_toggle = 0;
+  c.tapping_toggle = 5;
+}
+
+struct Qs { uint16_t qsid; uint8_t offset, width; int8_t bit; };   // bit -1: the whole value
+const Qs QSETTINGS[] = {
+  {5, offsetof(RemapSettings, osk_tap_toggle), 1, -1},
+  {6, offsetof(RemapSettings, osk_timeout), 2, -1},
+  {7, offsetof(RemapSettings, tapping_term), 2, -1},
+  {20, offsetof(RemapSettings, tapping_toggle), 1, -1},
+  {22, offsetof(RemapSettings, tapping_flags), 1, 0},   // permissive hold
+  {23, offsetof(RemapSettings, tapping_flags), 1, 1},   // hold on other key press
+  {24, offsetof(RemapSettings, tapping_flags), 1, 2},   // retro tapping
+  {25, offsetof(RemapSettings, quick_tap_term), 2, -1},
+};
+
+const Qs *find_qs(uint16_t qsid) {
+  for (const Qs &q : QSETTINGS)
+    if (q.qsid == qsid) return &q;
+  return nullptr;
+}
+
 bool unlock_keys_held() {
   for (uint8_t u : UNLOCK_USAGES)
     if (!pos_down[remap_pos(u)]) return false;
@@ -318,11 +406,63 @@ void vial_cmd(uint8_t *msg) {
     case VIAL_LOCK:
       unlocked = 0;
       break;
-    case VIAL_QMK_SETTINGS_QUERY:
-      memset(msg, 0xFF, 32);                                // no QMK settings
+    case VIAL_QMK_SETTINGS_QUERY: {                         // the qsids above the one asked for
+      uint16_t gt = msg[2] | (msg[3] << 8);
+      memset(msg, 0xFF, 32);
+      int n = 0;
+      for (const Qs &q : QSETTINGS)
+        if (q.qsid > gt && n < 16) { msg[n * 2] = q.qsid; msg[n * 2 + 1] = q.qsid >> 8; n++; }
+      break;
+    }
+    case VIAL_QMK_SETTINGS_GET: {
+      const Qs *q = find_qs(msg[2] | (msg[3] << 8));
+      if (!q) { msg[0] = 0xFF; break; }
+      const uint8_t *v = (const uint8_t *)&blob.settings + q->offset;
+      memset(msg, 0, 32);
+      if (q->bit >= 0) msg[1] = (v[0] >> q->bit) & 1;
+      else memcpy(msg + 1, v, q->width);                    // little endian, as stored
+      break;
+    }
+    case VIAL_QMK_SETTINGS_SET: {
+      const Qs *q = find_qs(msg[2] | (msg[3] << 8));
+      if (!q) { msg[0] = 0xFF; break; }
+      uint8_t *v = (uint8_t *)&blob.settings + q->offset;
+      if (q->bit >= 0) v[0] = (v[0] & ~(1 << q->bit)) | ((msg[4] & 1) << q->bit);
+      else memcpy(v, msg + 4, q->width);
+      if (blob.settings.tapping_term < 10) blob.settings.tapping_term = 10;
+      touch();
+      msg[0] = 0;
+      break;
+    }
+    case VIAL_QMK_SETTINGS_RESET:
+      settings_defaults();
+      touch();
       break;
     case VIAL_DYNAMIC_ENTRY_OP:
-      if (msg[2] == 0) memset(msg, 0, 32);                  // 0 tap dance / combo / key override / alt repeat
+      switch (msg[2]) {
+        case 0x00:                                          // counts: tap dance, combo, key override, alt repeat
+          memset(msg, 0, 32);
+          msg[0] = REMAP_TAP_DANCES;
+          break;
+        case 0x01: {                                        // tap dance get: 5 x u16 LE
+          uint8_t i = msg[3];
+          if (i >= REMAP_TAP_DANCES) { msg[0] = 0xFF; break; }
+          memset(msg, 0, 32);
+          memcpy(msg + 1, &blob.tap_dance[i], sizeof(RemapTapDance));
+          break;
+        }
+        case 0x02: {                                        // tap dance set
+          uint8_t i = msg[3];
+          if (i >= REMAP_TAP_DANCES) { msg[0] = 0xFF; break; }
+          memcpy(&blob.tap_dance[i], msg + 4, sizeof(RemapTapDance));
+          touch();
+          msg[0] = 0;
+          break;
+        }
+        default:
+          msg[0] = 0xFF;
+          break;
+      }
       break;
     default:
       break;
@@ -340,13 +480,20 @@ void remap_defaults() {
   blob.layout_options = DEFAULT_LAYOUT;
   blob.conversion = REMAP_CONV_NONE;
   memset(blob.reserved, 0, sizeof(blob.reserved));
+  settings_defaults();
+  memset(blob.tap_dance, 0, sizeof(blob.tap_dance));
+  for (auto &td : blob.tap_dance) td.tapping_term = 200;   // as Vial: each entry has its own term
   for (int l = 0; l < REMAP_LAYERS; l++)
     for (int p = 0; p < REMAP_POSITIONS; p++)
       blob.keymap[l][p] = l == 0 ? pos_usage(p) : (pos_usage(p) ? KC_TRNS : KC_NO);
 }
 
+// Saved once the changes are SAVE_DELAY_MS old and Vial has been quiet that long: a flash write
+// stops the answers for a few hundred ms, and a request left unanswered for 500 ms is sent again by
+// the GUI (Pipette), which then reads every answer one request late.
 bool remap_save_due() {
-  if (!dirty || millis() - changed_ms < SAVE_DELAY_MS) return false;
+  uint32_t now = millis();
+  if (!dirty || now - changed_ms < SAVE_DELAY_MS || now - last_vial_ms < SAVE_DELAY_MS) return false;
   dirty = false;
   return true;
 }
@@ -362,32 +509,327 @@ void remap_release_all() {
   wheel_v = wheel_h = 0;
   layer_state = 0;
   conv_pos = -1;
+  pend.active = false;
+  last_tap_pos = retro_pos = os_key_pos = os_tap_pos = -1;
+  osm_armed = osm_locked = 0;
+  osl_armed = osl_locked = -1;
+  tt_toggled = 0;
+  memset(tt_taps, 0, sizeof(tt_taps));
+  dance.active = false;
+  dance_held_pos = -1;
+  memset(os_mods_at, 0, sizeof(os_mods_at));
 }
 
-void remap_key(uint8_t usage, bool pressed) {
+namespace {
+
+const RemapSettings &cfg() { return blob.settings; }
+
+bool is_tap_hold(uint16_t kc) {
+  return (kc >= QK_MOD_TAP && kc <= QK_MOD_TAP_MAX) || (kc >= QK_LAYER_TAP && kc <= QK_LAYER_TAP_MAX);
+}
+// what a held MT / LT does: its mods (QK_MODS with no key) / MO(layer)
+uint16_t hold_code(uint16_t kc) {
+  if (kc <= QK_MOD_TAP_MAX) return ((kc >> 8) & 0x1F) << 8;
+  return QK_MOMENTARY | ((kc >> 8) & 0x0F);
+}
+
+// a key that types something: the one-shot mods / layer apply to it and are used up
+bool sends_key(uint16_t kc) {
+  return (kc >= 0x04 && kc <= 0xFF && !(kc >= 0xE0 && kc <= 0xE7)) || (kc >= QK_MODS && kc <= QK_MODS_MAX && (kc & 0xFF));
+}
+
+void process(uint8_t usage, bool pressed);
+
+void send_press(int p, uint16_t kc) {
+  if (blob.conversion && kc >= 0x04 && kc <= 0xA4) {
+    uint8_t shift = (mod_count[1] || mod_count[5] || (osm_armed & 0x22)) ? 1 : 0;
+    const Conv *c = blob.conversion == REMAP_CONV_JIS_TO_US ? find_conv(JIS_TO_US, kc, shift) : find_conv(US_TO_JIS, kc, shift);
+    if (c) {
+      kc = c->out;
+      if (c->out_shift != shift) { conv_pos = p; conv_shift = c->out_shift; }
+    }
+  }
+  bool typing = sends_key(kc);
+  if (typing && osm_armed) {                                // one-shot mods: on this key only
+    os_mods_at[p] = osm_armed;
+    mods_down(osm_armed);
+    osm_armed = 0;
+  }
+  pos_kc[p] = kc;
+  action(kc, true);
+  if (typing && osl_armed >= 0) {                           // one-shot layer: used by this key
+    if (osl_armed != osl_locked) layer_state &= ~(1UL << osl_armed);
+    osl_armed = -1;
+  }
+}
+
+void tap_code(uint16_t kc) {
+  action(kc, true);
+  report();
+  action(kc, false);
+  report();
+}
+
+// As a Vial keyboard behaves: while the key is held, the entry's own term decides a hold; once it
+// is released, the tapping term setting decides when the taps are counted (both from the press).
+uint32_t dance_term() {
+  uint16_t t = blob.tap_dance[dance.idx].tapping_term;
+  return dance.pressed && t ? t : cfg().tapping_term;
+}
+
+// The counting is over (time, another key, or another tap dance): what the taps and holds mean.
+void dance_finish() {
+  const RemapTapDance &td = blob.tap_dance[dance.idx];
+  dance.active = false;
+  uint16_t down = 0;
+  if (dance.count == 1) {
+    down = (dance.interrupted || !dance.pressed) ? td.on_tap : (td.on_hold ? td.on_hold : td.on_tap);
+  } else if (dance.count == 2) {
+    if (dance.interrupted) {                                 // two single taps
+      if (td.on_tap) { tap_code(td.on_tap); down = td.on_tap; }
+    } else if (dance.pressed) {                              // tap, then hold
+      if (td.on_tap_hold) down = td.on_tap_hold;
+      else if (td.on_tap) { tap_code(td.on_tap); down = td.on_hold ? td.on_hold : td.on_tap; }
+      else down = td.on_hold;
+    } else if (td.on_double_tap) {
+      down = td.on_double_tap;
+    } else if (td.on_tap) {
+      tap_code(td.on_tap); down = td.on_tap;
+    }
+  }                                                          // 3 and more: typed while tapping
+  if (!down) return;
+  action(down, true);
+  if (dance.pressed) { dance_held_pos = dance.pos; dance_held_kc = down; }
+  else { report(); action(down, false); }
+}
+
+void release(int p, uint32_t now) {
+  pos_down[p] = false;
+  uint16_t kc = pos_kc[p];
+  if (p == conv_pos) conv_pos = -1;
+  if (kc >= QK_ONE_SHOT_MOD && kc < QK_ONE_SHOT_MOD + 0x20) {
+    uint8_t m = hid_mods(kc & 0x1F);
+    mods_up(m);
+    if (!os_key_used && now - pos_ms[p] < cfg().tapping_term) {   // tapped
+      if (osm_locked & m) { mods_up(osm_locked & m); osm_locked &= ~m; osm_armed &= ~m; }
+      else {
+        os_taps = (os_tap_pos == p && now - os_tap_ms < cfg().tapping_term) ? os_taps + 1 : 1;
+        os_tap_pos = p;
+        os_tap_ms = now;
+        if (cfg().osk_tap_toggle && os_taps >= cfg().osk_tap_toggle) {
+          osm_locked |= m; mods_down(m); osm_armed &= ~m; os_taps = 0;
+        } else {
+          osm_armed |= m; os_ms = now;
+        }
+      }
+    }
+    os_key_pos = -1;
+  } else if (kc >= QK_ONE_SHOT_LAYER && kc < QK_ONE_SHOT_LAYER + 0x20) {
+    int8_t l = kc & 0x1F;
+    bool tap = !os_key_used && now - pos_ms[p] < cfg().tapping_term;
+    if (tap && osl_locked == l) {                           // tapped while locked: off
+      osl_locked = -1; osl_armed = -1; layer_state &= ~(1UL << l);
+    } else if (tap) {
+      os_taps = (os_tap_pos == p && now - os_tap_ms < cfg().tapping_term) ? os_taps + 1 : 1;
+      os_tap_pos = p;
+      os_tap_ms = now;
+      if (cfg().osk_tap_toggle && os_taps >= cfg().osk_tap_toggle) { osl_locked = l; osl_armed = -1; os_taps = 0; }
+      else { osl_armed = l; os_ms = now; }                  // the layer stays on for the next key
+    } else if (osl_locked != l && osl_armed != l) {
+      layer_state &= ~(1UL << l);                           // held: it was MO
+    }
+    os_key_pos = -1;
+  } else if (kc >= QK_TAP_DANCE && kc < QK_TAP_DANCE + REMAP_TAP_DANCES) {
+    if (dance.active && dance.pos == p) dance.pressed = false;   // the term runs from the press
+    else if (dance_held_pos == p) { action(dance_held_kc, false); dance_held_pos = -1; }
+  } else if (kc >= QK_LAYER_TAP_TOGGLE && kc < QK_LAYER_TAP_TOGGLE + 0x20) {
+    uint8_t l = kc & 0x1F;
+    if (now - pos_ms[p] < cfg().tapping_term) {             // tapped: count toward toggling
+      tt_taps[l] = now - tt_ms[l] < cfg().tapping_term ? tt_taps[l] + 1 : 1;
+      tt_ms[l] = now;
+      if (cfg().tapping_toggle && tt_taps[l] >= cfg().tapping_toggle) { tt_toggled ^= 1UL << l; tt_taps[l] = 0; }
+    }
+    if (tt_toggled & (1UL << l)) layer_state |= 1UL << l;
+    else layer_state &= ~(1UL << l);
+  } else {
+    action(kc, false);
+  }
+  if (os_mods_at[p]) { mods_up(os_mods_at[p]); os_mods_at[p] = 0; }
+  if (p == retro_pos) {                                     // held alone past the term: still a tap
+    retro_pos = -1;
+    if (press_seq == retro_seq && retro_kc) {
+      report();
+      action(retro_kc, true);
+      report();
+      action(retro_kc, false);
+    }
+  }
+}
+
+void press(int p, uint32_t now) {
+  pos_down[p] = true;
+  pos_ms[p] = now;
+  press_seq++;
+  conv_pos = -1;                                            // a new key ends any shift override
+  if (os_key_pos >= 0) os_key_used = true;
+  uint16_t kc = resolve(p);
+  bool is_dance = kc >= QK_TAP_DANCE && kc < QK_TAP_DANCE + REMAP_TAP_DANCES;
+  if (dance.active && (!is_dance || dance.pos != p)) {       // another key: the dance is over
+    dance.interrupted = true;
+    dance_finish();
+    report();
+  }
+  if (is_dance) {
+    if (!dance.active) {
+      dance.active = true; dance.idx = kc - QK_TAP_DANCE; dance.pos = p;
+      dance.count = 0; dance.interrupted = false;
+    }
+    dance.count++;
+    dance.pressed = true;
+    dance.ms = now;
+    pos_kc[p] = kc;
+    uint16_t t = blob.tap_dance[dance.idx].on_tap;
+    if (t && dance.count == 3) { tap_code(t); tap_code(t); tap_code(t); }
+    else if (t && dance.count > 3) tap_code(t);
+    return;
+  }
+  if (is_tap_hold(kc)) {
+    if (p == last_tap_pos && now - last_tap_ms < cfg().quick_tap_term) {
+      send_press(p, kc & 0xFF);                             // tap, then press again: the tap key held
+      return;
+    }
+    pend.active = true; pend.pos = p; pend.kc = kc; pend.ms = now; pend.n = 0;
+    return;
+  }
+  last_tap_pos = -1;
+  if (kc >= QK_ONE_SHOT_MOD && kc < QK_ONE_SHOT_MOD + 0x20) {
+    pos_kc[p] = kc;
+    mods_down(hid_mods(kc & 0x1F));                         // held: a plain modifier
+    os_key_pos = p; os_key_used = false;
+    return;
+  }
+  if (kc >= QK_ONE_SHOT_LAYER && kc < QK_ONE_SHOT_LAYER + 0x20) {
+    if ((kc & 0x1F) >= REMAP_LAYERS) { pos_kc[p] = KC_NO; return; }
+    pos_kc[p] = kc;
+    layer_state |= 1UL << (kc & 0x1F);                      // held: MO
+    os_key_pos = p; os_key_used = false;
+    return;
+  }
+  if (kc >= QK_LAYER_TAP_TOGGLE && kc < QK_LAYER_TAP_TOGGLE + 0x20) {
+    if ((kc & 0x1F) >= REMAP_LAYERS) { pos_kc[p] = KC_NO; return; }
+    pos_kc[p] = kc;
+    layer_state |= 1UL << (kc & 0x1F);                      // held: MO
+    return;
+  }
+  send_press(p, kc);
+}
+
+// The events that waited for a tap-hold decision, each with its own report (a key pressed and
+// released while waiting must still be seen).
+void replay(const Pending &pd) {
+  for (uint8_t i = 0; i < pd.n; i++) {
+    if (i) report();
+    process(pd.buf[i].usage, pd.buf[i].pressed);
+  }
+}
+
+// The pending tap-hold key is held: its hold action, then the events that waited.
+void decide_hold() {
+  Pending pd = pend;
+  pend.active = false;
+  pos_kc[pd.pos] = hold_code(pd.kc);
+  action(pos_kc[pd.pos], true);
+  retro_pos = -1;
+  if ((cfg().tapping_flags & REMAP_TAP_RETRO) && pd.n == 0) {
+    retro_pos = pd.pos; retro_kc = pd.kc & 0xFF; retro_seq = press_seq;
+  }
+  replay(pd);
+}
+
+void process(uint8_t usage, bool pressed) {
+  uint32_t now = millis();
   int p = remap_pos(usage);
+  if (pend.active) {
+    if (p == pend.pos && !pressed) {                        // the tap-hold key released
+      if (now - pend.ms < cfg().tapping_term) {             // tap: press, release, then the rest
+        Pending pd = pend;
+        pend.active = false;
+        send_press(p, pd.kc & 0xFF);
+        report();
+        release(p, now);
+        last_tap_pos = p;
+        last_tap_ms = now;
+        if (pd.n) report();                                 // the tap's release on its own
+        replay(pd);
+      } else {
+        decide_hold();
+        release(p, now);
+      }
+      return;
+    }
+    if (pend.n == sizeof(pend.buf) / sizeof(pend.buf[0])) {
+      decide_hold();
+      process(usage, pressed);
+      return;
+    }
+    pend.buf[pend.n++] = {usage, pressed};
+    if (pressed && (cfg().tapping_flags & REMAP_TAP_HOLD_ON_OTHER_KEY)) { decide_hold(); return; }
+    if (!pressed && (cfg().tapping_flags & REMAP_TAP_PERMISSIVE_HOLD)) {
+      for (uint8_t i = 0; i + 1 < pend.n; i++)              // a key pressed and released inside it
+        if (pend.buf[i].usage == usage && pend.buf[i].pressed) { decide_hold(); return; }
+    }
+    return;
+  }
   if (p < 0) {                                              // outside the matrix: as it came
     pressed ? usage_down(usage) : usage_up(usage);
     return;
   }
   if (pressed == pos_down[p]) return;
-  pos_down[p] = pressed;
-  if (pressed) {
-    uint16_t kc = resolve(p);
-    conv_pos = -1;                                          // a new key ends any shift override
-    if (blob.conversion && kc >= 0x04 && kc <= 0xA4) {
-      uint8_t shift = (mod_count[1] || mod_count[5]) ? 1 : 0;
-      const Conv *c = blob.conversion == REMAP_CONV_JIS_TO_US ? find_conv(JIS_TO_US, kc, shift) : find_conv(US_TO_JIS, kc, shift);
-      if (c) {
-        kc = c->out;
-        if (c->out_shift != shift) { conv_pos = p; conv_shift = c->out_shift; }
-      }
-    }
-    pos_kc[p] = kc;
-  } else if (p == conv_pos) {
-    conv_pos = -1;
+  pressed ? press(p, now) : release(p, now);
+}
+
+}  // namespace
+
+void remap_key(uint8_t usage, bool pressed) { process(usage, pressed); }
+
+void remap_set_report_hook(void (*hook)()) { report_hook = hook; }
+
+bool remap_task() {
+  uint32_t now = millis();
+  bool changed = false;
+  if (pend.active && now - pend.ms >= cfg().tapping_term) {
+    decide_hold();
+    changed = true;
   }
-  action(pos_kc[p], pressed);
+  if (dance.active && now - dance.ms >= dance_term()) {
+    dance_finish();
+    changed = true;
+  }
+  if (cfg().osk_timeout && (osm_armed || (osl_armed >= 0 && osl_armed != osl_locked)) &&
+      now - os_ms >= cfg().osk_timeout) {
+    osm_armed = 0;
+    if (osl_armed >= 0 && osl_armed != osl_locked) layer_state &= ~(1UL << osl_armed);
+    osl_armed = -1;
+    changed = true;
+  }
+  return changed;
+}
+
+uint32_t remap_ms_to_next_event() {
+  uint32_t now = millis(), next = UINT32_MAX;
+  if (pend.active) {
+    uint32_t t = now - pend.ms;
+    next = t >= cfg().tapping_term ? 0 : cfg().tapping_term - t;
+  }
+  if (dance.active) {
+    uint32_t t = now - dance.ms;
+    next = std::min<uint32_t>(next, t >= dance_term() ? 0 : dance_term() - t);
+  }
+  if (cfg().osk_timeout && (osm_armed || osl_armed >= 0)) {
+    uint32_t t = now - os_ms;
+    next = std::min<uint32_t>(next, t >= cfg().osk_timeout ? 0 : cfg().osk_timeout - t);
+  }
+  return next;
 }
 
 bool remap_take_custom(uint8_t &id) {
@@ -418,6 +860,7 @@ bool remap_take_wheel(int8_t &v, int8_t &h) {
 }
 
 bool remap_vial(uint8_t *msg) {
+  last_vial_ms = millis();
   uint8_t *d = msg + 1;
   // while an unlock is running, only the Vial commands it needs
   if (unlock_busy && !(msg[0] == ID_VIAL_PREFIX && (msg[1] <= VIAL_GET_DEF || (msg[1] >= VIAL_GET_UNLOCK_STATUS && msg[1] <= VIAL_UNLOCK_POLL))))

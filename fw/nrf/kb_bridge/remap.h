@@ -18,6 +18,11 @@ int remap_pos(uint8_t usage);                 // -1: not in the matrix (passed t
 void remap_defaults();                        // layer 0 = what the keyboard sends, others transparent
 void remap_release_all();                     // every key up, layers back to the default layer
 void remap_key(uint8_t usage, bool pressed);  // one key event from the keyboard
+// Timers (tap-hold decisions, one-shot timeout): call every loop. true: what the keymap sends changed.
+bool remap_task();
+uint32_t remap_ms_to_next_event();            // when remap_task() has something to do (UINT32_MAX: nothing)
+// Called whenever the keymap needs a report sent before it goes on (a tap: press, then release).
+void remap_set_report_hook(void (*hook)());
 
 // What the keymap currently sends.
 uint8_t remap_mods();
@@ -44,11 +49,33 @@ uint8_t remap_conversion();
 bool remap_vial(uint8_t msg[32]);
 
 // Storage (remap_store.cpp on the nRF): the keymap and layout options as one blob.
+// QMK settings Vial can change (Behavior / QMK settings tab), little endian as on the wire.
+struct RemapSettings {
+  uint16_t tapping_term;                      // qsid 7: ms until a tap-hold key counts as held
+  uint16_t quick_tap_term;                    // qsid 25: tap then press again within this: tap held
+  uint16_t osk_timeout;                       // qsid 6: one-shot given up after this (0: never)
+  uint8_t tapping_flags;                      // qsid 22 / 23 / 24: REMAP_TAP_* bits
+  uint8_t osk_tap_toggle;                     // qsid 5: one-shot tapped this often locks (0: never)
+  uint8_t tapping_toggle;                     // qsid 20: TT tapped this often toggles its layer
+  uint8_t reserved[55];                       // later settings without a new file format
+};
+enum : uint8_t { REMAP_TAP_PERMISSIVE_HOLD = 1, REMAP_TAP_HOLD_ON_OTHER_KEY = 2, REMAP_TAP_RETRO = 4 };
+
+// Tap dance (Vial Tap Dance tab): TD(n) = QK_TAP_DANCE + n.
+#define REMAP_TAP_DANCES 16
+struct RemapTapDance {
+  uint16_t on_tap, on_hold, on_double_tap, on_tap_hold;
+  uint16_t tapping_term;                      // held this long: a hold (0: the tapping term setting)
+};
+static_assert(sizeof(RemapTapDance) == 10, "Vial's tap dance entry: 5 x u16");
+
 struct RemapBlob {
   uint32_t magic;
   uint32_t layout_options;
   uint8_t conversion;                         // REMAP_CONV_*
   uint8_t reserved[3];
+  RemapSettings settings;
+  RemapTapDance tap_dance[REMAP_TAP_DANCES];
   uint16_t keymap[REMAP_LAYERS][REMAP_POSITIONS];
 };
 RemapBlob &remap_blob();

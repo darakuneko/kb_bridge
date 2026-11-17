@@ -374,5 +374,6 @@ void loop() {
   // in between; the UART buffers what the CH559 sends meanwhile (1 KB, build.sh). CH559 asleep and
   // UART off: 100 ms; BLE writes and the CH559's wake byte cut the wait short (wake.h).
   uint32_t wait = millis() - busy_ms < LOOP_BUSY_HOLD_MS ? 1 : link_uart_off() ? LOOP_SLEEP_MS : LOOP_IDLE_MS;
-  loop_wait(min(wait, ui_ms_to_next_event()));    // a keep-alive pulse ends on time
+  // a keep-alive pulse ends on time; a tap-hold key is decided on time
+  loop_wait(min(wait, min(ui_ms_to_next_event(), remap_ms_to_next_event())));
 }
