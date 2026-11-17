@@ -16,8 +16,8 @@
             "build_id": "0xFF329865"
           },
           "notes": {
-            "ja": "Vial に対応していないキーボードのキーを、KB Bridge 側で入れ替えられるように。Vial や Pipette に「KB Bridge」として見えます（8 レイヤー、Mod-Tap / Layer-Tap、タップダンス、マクロ、コンボ、キーオーバーライド、マウスキー、JIS / US 変換、接続先の切り替えキーなど）。Vial 対応のキーボードは今まで通り、キーボード側の Vial を使います。",
-            "en": "Remap keyboards without Vial in KB Bridge itself: it shows up in Vial and Pipette as \"KB Bridge\" (8 layers, Mod-Tap / Layer-Tap, tap dance, macros, combos, key overrides, mouse keys, JIS / US conversion, host switch keys and more). Vial keyboards keep using their own Vial as before."
+            "ja": "Vial にも VIA にも対応していないキーボード（市販のキーボードなど）のキーを、KB Bridge 側で入れ替えられるように。Vial や Pipette に「KB Bridge」として見えます（8 レイヤー、Mod-Tap / Layer-Tap、タップダンス、マクロ、コンボ、キーオーバーライド、マウスキー、JIS / US 変換、接続先の切り替えキーなど）。Vial や VIA に対応したキーボードは今まで通り、キーボードのキーマップのまま動きます（対応表はガイドの「Vial」）。",
+            "en": "Remap keyboards that support neither Vial nor VIA (off-the-shelf keyboards, for example) in KB Bridge itself: it shows up in Vial and Pipette as \"KB Bridge\" (8 layers, Mod-Tap / Layer-Tap, tap dance, macros, combos, key overrides, mouse keys, JIS / US conversion, host switch keys and more). Vial and VIA keyboards keep their own keymap as before (see the table under \"Vial\" in the guide)."
           }
         },
         {
