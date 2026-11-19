@@ -128,6 +128,12 @@
     <h3>Switching between devices</h3>
     <p>KB Bridge can be paired with up to 4 devices and switched between them with the buttons. Pressing PAIR and LOW-I together and releasing them selects the next slot, and the LED blinks green as many times as its number. The selection is saved and kept when the power is turned off.</p>
     <p>Each slot looks like a separate device: they appear as "KB Bridge 1" to "KB Bridge 4". To add a device, switch to a free slot and pair with that name. A device paired with a slot that is not selected never connects.</p>
+    <h3>Power</h3>
+    <p>Plug a USB power source into J1. KB Bridge also powers the keyboard.</p>
+    <ul>
+      <li><strong>A computer or a USB AC adapter</strong>: steady voltage and no auto-off. Use one of these for the most stable operation (the keep-alive can be off).</li>
+      <li><strong>A power bank or batteries</strong>: portable, but the voltage drops as they run down, and a power bank may switch itself off. One red blink every 5 s means the supply voltage is low.</li>
+    </ul>
     <h3>Power-bank keep-alive (LOW-I)</h3>
     <p>KB Bridge draws so little current when idle that a power bank may decide it is not in use and switch itself off. The keep-alive draws a short burst of current now and then to prevent that.</p>
     <table>
@@ -219,6 +225,7 @@
       <tr><td>It will not connect, or keeps disconnecting</td><td>With that slot selected, hold PAIR for 3 s to forget its pairings, remove that slot's KB Bridge 1–4 on the other device as well, and pair again</td></tr>
       <tr><td>It does not reconnect after a power cycle even though you paired it again; the selected slot or the LOW-I setting goes back after a power cycle</td><td>A power loss in the middle of a write or save may have corrupted the storage inside the KB Bridge (writing the firmware again does not fix it). On the <a href="./?lang=en">updater</a>, tick "Initialise pairings and settings before writing" and write, then remove KB Bridge on your devices and pair again. The pairings of every slot and the settings are erased</td></tr>
       <tr><td>The power bank switches off</td><td>Press LOW-I to choose "strong" (green ×3)</td></tr>
+      <tr><td>The LED blinks red once every 5 s; it drops out or stops typing now and then</td><td>The supply voltage is low. Charge or replace the power bank or batteries, or power it from a computer or a USB AC adapter</td></tr>
       <tr><td>On Linux (Ubuntu etc.) typing stops working after a while; reconnecting fixes it</td><td>The computer's wireless adapter power saving (USB autosuspend) causes this. If <code>cat /sys/module/btusb/parameters/enable_autosuspend</code> prints <code>Y</code>, run <code>echo 'options btusb enable_autosuspend=0' | sudo tee /etc/modprobe.d/btusb.conf</code> and restart the computer (it should then print <code>N</code>)</td></tr>
       <tr><td>Writing stops part way or fails</td><td>Unplug, plug in again while holding PAIR and write again. An interrupted write is fixed by writing again. If it keeps failing, clone the <a href="https://github.com/darakuneko/kb_bridge">GitHub repository</a> and write from your own computer (see "Local testing" in the README)</td></tr>
       <tr><td>"KB Bridge Update" does not appear on the updater</td><td>The CH559 may not have been written. Redo <a href="#ch559">2. Write the CH559</a> (this also works with the HY0020 fitted). If it still does not appear, check that you hold PAIR while plugging in and that the cable carries data</td></tr>
